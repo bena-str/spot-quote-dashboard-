@@ -153,6 +153,11 @@ table.mds-table { width:100%; border-collapse:collapse; }
 .bar-track { flex:1; height:16px; background:var(--color-bright-grey); border-radius:9999px; overflow:hidden; }
 .bar-fill  { height:100%; background:var(--color-maersk-blue); border-radius:9999px; }
 .bar-value { flex:0 0 90px; text-align:right; font-size:13px; font-weight:700; color:var(--color-black); font-variant-numeric:tabular-nums; }
+.rank-scroll { max-height:280px; overflow-y:auto; padding-right:6px; margin-right:-6px; }
+.rank-scroll::-webkit-scrollbar { width:6px; }
+.rank-scroll::-webkit-scrollbar-thumb { background:var(--color-light-grey); border-radius:3px; }
+.rank-scroll::-webkit-scrollbar-track { background:transparent; }
+.rank-scroll .bar-row:last-child { margin-bottom:0; }
 
 /* ── Grouped vertical bar chart (Quote Activity) ─────────── */
 .bar-chart { display:flex; gap:8px; align-items:stretch; height:220px; padding:4px 0 0; }
@@ -275,6 +280,19 @@ const QUOTES = [
   { id:"QFD-05347", customer:"Lockheed Martin",   origin:"ATL", dest:"FRA", cw:4800,  amount:43100,  status:"Draft",            owner:"James T.",  created:"2026-04-18", updated:"2026-04-19" },
 ];
 
+// IATA airport → country (for dashboard country-level filters)
+const IATA_COUNTRY = {
+  // NAM origins
+  ORD:"United States", SEA:"United States", SFO:"United States", ATL:"United States",
+  MSP:"United States", DFW:"United States", DTW:"United States", GRR:"United States",
+  JFK:"United States", PHL:"United States", CVG:"United States", LAX:"United States",
+  MIA:"United States", PDX:"United States",
+  // Destinations
+  FRA:"Germany", NRT:"Japan", SHA:"China", AMS:"Netherlands", LHR:"United Kingdom",
+  HKG:"Hong Kong SAR", ICN:"South Korea", CDG:"France", BRU:"Belgium", GRU:"Brazil",
+};
+const countryFor = (code) => IATA_COUNTRY[code] || code;
+
 const STATUS_STYLE = {
   "Won":"success", "Lost":"error", "Expired":"neutral",
   "Awaiting Customer":"info", "Pending Approval":"warning", "Draft":"warning",
@@ -383,15 +401,16 @@ const fmtMoney = (n) => "$" + n.toLocaleString("en-US", { maximumFractionDigits:
 const fmtKg    = (n) => n.toLocaleString("en-US") + " kg";
 const fmtShort = (n, m) => m === "revenue" ? fmtMoney(n) : m === "tonnage" ? fmtKg(n) : n.toLocaleString("en-US");
 
-const aggregate = (rows, key, metric) => {
+const aggregate = (rows, key, metric, limit = 5) => {
   const acc = new Map();
   rows.forEach(r => {
     const k = key === "lane" ? `${r.origin} → ${r.dest}` : r[key];
     const v = metric === "revenue" ? r.amount : metric === "tonnage" ? r.cw : 1;
     acc.set(k, (acc.get(k) || 0) + v);
   });
-  return [...acc.entries()].map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value).slice(0, 5);
+  const sorted = [...acc.entries()].map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+  return limit ? sorted.slice(0, limit) : sorted;
 };
 
 // ─── Small components ──────────────────────────────────────────────────────
@@ -573,12 +592,24 @@ function Dashboard() {
   const [actMetric,  setActMetric]  = useState("count");
   const [customFrom, setCustomFrom] = useState("2026-04-14");
   const [customTo,   setCustomTo]   = useState("2026-04-18");
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [originFilter,   setOriginFilter]   = useState("");
+  const [destFilter,     setDestFilter]     = useState("");
+
+  const originCountries = useMemo(() => Array.from(new Set(QUOTES.map(q => countryFor(q.origin)))).sort(), []);
+  const destCountries   = useMemo(() => Array.from(new Set(QUOTES.map(q => countryFor(q.dest))))  .sort(), []);
 
   const rows = useMemo(() => {
-    const byDate = (r) => range === "week" ? r.created >= "2026-04-13" : true;
-    const byScope = (r) => scope === "mine" ? r.owner === "Oliver M." : true;
-    return QUOTES.filter(r => byDate(r) && byScope(r));
-  }, [range, scope]);
+    const byDate     = (r) => range === "week" ? r.created >= "2026-04-13" : true;
+    const byScope    = (r) => scope === "mine" ? r.owner === "Oliver M." : true;
+    const cq = customerFilter.trim().toLowerCase();
+    const oq = originFilter.trim().toLowerCase();
+    const dq = destFilter.trim().toLowerCase();
+    const byCustomer = (r) => !cq || r.customer.toLowerCase().includes(cq);
+    const byOrigin   = (r) => !oq || countryFor(r.origin).toLowerCase().includes(oq);
+    const byDest     = (r) => !dq || countryFor(r.dest)  .toLowerCase().includes(dq);
+    return QUOTES.filter(r => byDate(r) && byScope(r) && byCustomer(r) && byOrigin(r) && byDest(r));
+  }, [range, scope, customerFilter, originFilter, destFilter]);
 
   const quotesCreated = rows.length;
   const quotesPrev = range === "week" ? 18 : range === "month" ? 74 : range === "quarter" ? 210 : 12;
@@ -587,8 +618,8 @@ function Dashboard() {
   const closed = rows.filter(r => ["Won","Lost","Expired"].includes(r.status));
   const won = rows.filter(r => r.status === "Won").length;
   const winRatio = closed.length ? (won / closed.length) * 100 : 0;
-  const topCustomers = useMemo(() => aggregate(rows, "customer", custMetric), [rows, custMetric]);
-  const topLanes     = useMemo(() => aggregate(rows, "lane",     laneMetric), [rows, laneMetric]);
+  const topCustomers = useMemo(() => aggregate(rows, "customer", custMetric, 0), [rows, custMetric]);
+  const topLanes     = useMemo(() => aggregate(rows, "lane",     laneMetric, 0), [rows, laneMetric]);
 
   const custMax = Math.max(...topCustomers.map(c => c.value), 1);
   const laneMax = Math.max(...topLanes.map(l => l.value), 1);
@@ -657,6 +688,58 @@ function Dashboard() {
         </select>
         <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--color-mid-grey)" }}>
           Comparing to <strong style={{ color: "var(--color-dark-grey)" }}>{comparisonLabel}</strong>
+        </div>
+      </div>
+
+      {/* Secondary filters — customer / origin country / destination country */}
+      <div className="controls" style={{ marginTop: -8 }}>
+        <span className="control-label">Filter</span>
+        <input
+          type="text"
+          className="search-input"
+          style={{ width: 220 }}
+          placeholder="Search customer..."
+          value={customerFilter}
+          onChange={(e) => setCustomerFilter(e.target.value)}
+          aria-label="Customer"
+        />
+        <input
+          type="text"
+          className="search-input"
+          style={{ width: 200 }}
+          list="origin-countries"
+          placeholder="Origin country..."
+          value={originFilter}
+          onChange={(e) => setOriginFilter(e.target.value)}
+          aria-label="Origin country"
+        />
+        <datalist id="origin-countries">
+          {originCountries.map(c => <option key={c} value={c} />)}
+        </datalist>
+        <input
+          type="text"
+          className="search-input"
+          style={{ width: 220 }}
+          list="dest-countries"
+          placeholder="Destination country..."
+          value={destFilter}
+          onChange={(e) => setDestFilter(e.target.value)}
+          aria-label="Destination country"
+        />
+        <datalist id="dest-countries">
+          {destCountries.map(c => <option key={c} value={c} />)}
+        </datalist>
+        {(customerFilter || originFilter || destFilter) && (
+          <button
+            className="btn btn-secondary"
+            style={{ padding: "7px 14px", fontSize: 13 }}
+            onClick={() => { setCustomerFilter(""); setOriginFilter(""); setDestFilter(""); }}
+          >
+            Clear
+          </button>
+        )}
+        <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--color-mid-grey)" }}>
+          <strong style={{ color: "var(--color-dark-grey)" }}>{rows.length}</strong> of {QUOTES.length} quotes
         </div>
       </div>
 
@@ -730,34 +813,44 @@ function Dashboard() {
           <div className="card-header">
             <div>
               <h3 className="card-title">Biggest Customers</h3>
-              <div className="card-sub">Top 5 by {custMetric === "revenue" ? "quoted value" : custMetric === "tonnage" ? "chargeable weight" : "quote count"}</div>
+              <div className="card-sub">{topCustomers.length} customers ranked by {custMetric === "revenue" ? "quoted value" : custMetric === "tonnage" ? "chargeable weight" : "quote count"}</div>
             </div>
             <MetricToggle value={custMetric} onChange={setCustMetric} />
           </div>
-          {topCustomers.map(c => (
-            <div className="bar-row" key={c.name}>
-              <div className="bar-label">{c.name}</div>
-              <div className="bar-track"><div className="bar-fill" style={{ width: `${(c.value / custMax) * 100}%` }} /></div>
-              <div className="bar-value">{fmtShort(c.value, custMetric)}</div>
-            </div>
-          ))}
+          <div className="rank-scroll">
+            {topCustomers.map(c => (
+              <div className="bar-row" key={c.name}>
+                <div className="bar-label">{c.name}</div>
+                <div className="bar-track"><div className="bar-fill" style={{ width: `${(c.value / custMax) * 100}%` }} /></div>
+                <div className="bar-value">{fmtShort(c.value, custMetric)}</div>
+              </div>
+            ))}
+            {topCustomers.length === 0 && (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--color-mid-grey)", fontSize: 13 }}>No customers match these filters.</div>
+            )}
+          </div>
         </div>
 
         <div className="card">
           <div className="card-header">
             <div>
               <h3 className="card-title">Biggest Lanes</h3>
-              <div className="card-sub">Top 5 by {laneMetric === "revenue" ? "quoted value" : laneMetric === "tonnage" ? "chargeable weight" : "quote count"}</div>
+              <div className="card-sub">{topLanes.length} lanes ranked by {laneMetric === "revenue" ? "quoted value" : laneMetric === "tonnage" ? "chargeable weight" : "quote count"}</div>
             </div>
             <MetricToggle value={laneMetric} onChange={setLaneMetric} />
           </div>
-          {topLanes.map(l => (
-            <div className="bar-row" key={l.name}>
-              <div className="bar-label" style={{ fontFamily: "'SF Mono','Menlo',monospace", fontSize: 13 }}>{l.name}</div>
-              <div className="bar-track"><div className="bar-fill" style={{ width: `${(l.value / laneMax) * 100}%`, background: "var(--color-mid-blue)" }} /></div>
-              <div className="bar-value">{fmtShort(l.value, laneMetric)}</div>
-            </div>
-          ))}
+          <div className="rank-scroll">
+            {topLanes.map(l => (
+              <div className="bar-row" key={l.name}>
+                <div className="bar-label" style={{ fontFamily: "'SF Mono','Menlo',monospace", fontSize: 13 }}>{l.name}</div>
+                <div className="bar-track"><div className="bar-fill" style={{ width: `${(l.value / laneMax) * 100}%`, background: "var(--color-mid-blue)" }} /></div>
+                <div className="bar-value">{fmtShort(l.value, laneMetric)}</div>
+              </div>
+            ))}
+            {topLanes.length === 0 && (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--color-mid-grey)", fontSize: 13 }}>No lanes match these filters.</div>
+            )}
+          </div>
         </div>
       </div>
     </>
