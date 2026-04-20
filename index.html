@@ -1,0 +1,1027 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Air Spot Quote — Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body, #root { margin: 0; padding: 0; height: 100%; }
+  body { background: #fff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+// ─── Design tokens (MDS colors.css) ─────────────────────────────────────────
+const tokens = `
+:root {
+  --color-maersk-blue:#42B0D5;
+  --color-white:#FFFFFF;
+  --color-black:#141414;
+  --color-dark-blue:#003E62;
+  --color-mid-blue:#1686BD;
+  --color-light-blue:#A1D1E8;
+  --color-bright-blue:#E2F3FB;
+  --color-dark-grey:#363636;
+  --color-mid-grey:#6A6A6A;
+  --color-light-grey:#D4D4D4;
+  --color-bright-grey:#F0F0F0;
+  --color-status-success-text:#316307;  --color-status-success-bg:#E8F6D0;  --color-status-success-border:#6CA926;
+  --color-status-warning-text:#7A5900;  --color-status-warning-bg:#FFFBE0;  --color-status-warning-border:#F5C200;
+  --color-status-error-text:#981F19;    --color-status-error-bg:#FFE9E7;    --color-status-error-border:#EA5D4B;
+  --color-status-info-text:#003E62;     --color-status-info-bg:#E2F3FB;     --color-status-info-border:#42B0D5;
+  --color-status-neutral-text:#363636;  --color-status-neutral-bg:#F0F0F0;  --color-status-neutral-border:#D4D4D4;
+}`;
+
+// ─── Global styles ──────────────────────────────────────────────────────────
+const styles = `
+* { box-sizing: border-box; }
+body, html, #root { margin:0; padding:0; }
+.mds-app {
+  font-family: 'Maersk Text', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  color: var(--color-black); background: var(--color-white); min-height:100vh;
+  font-size:14px; line-height:1.45; -webkit-font-smoothing: antialiased;
+}
+.topbar { height:64px; background:var(--color-white); border-bottom:1px solid var(--color-light-grey);
+  display:flex; align-items:center; justify-content:space-between; padding:0 24px; position:sticky; top:0; z-index:50; }
+.topbar-left { display:flex; align-items:center; gap:12px; }
+.topbar-right { display:flex; align-items:center; gap:18px; }
+.icon-btn { width:36px; height:36px; border:none; background:transparent; display:inline-flex;
+  align-items:center; justify-content:center; cursor:pointer; border-radius:4px; color:var(--color-dark-grey); }
+.icon-btn:hover { background:var(--color-bright-grey); }
+.app-name { font-size:16px; color:var(--color-black); margin-left:4px; }
+.avatar { width:32px; height:32px; border-radius:50%; background:var(--color-dark-blue); color:var(--color-white);
+  display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; letter-spacing:0.3px; }
+
+.shell { display:flex; min-height:calc(100vh - 64px); align-items:flex-start; }
+.sidebar { width:280px; flex:0 0 280px; background:var(--color-white);
+  border-right:1px solid var(--color-light-grey); padding:16px 12px;
+  position:sticky; top:64px; height:calc(100vh - 64px); overflow-y:auto; align-self:flex-start; }
+.nav-divider { height:1px; background:var(--color-light-grey); margin:12px 8px; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:10px 14px; font-size:14px;
+  color:var(--color-dark-grey); cursor:pointer; border-radius:6px; margin-bottom:2px; }
+.nav-item:hover { background:var(--color-bright-grey); }
+.nav-item.active { color:var(--color-white); font-weight:700; background:var(--color-black); }
+.nav-item.active svg { color:var(--color-white); }
+.nav-item svg { flex:0 0 20px; color:var(--color-dark-grey); }
+.nav-item .chev { margin-left:auto; flex:0 0 14px; color:var(--color-mid-grey); }
+.nav-item.parent.has-active > span.label { color:var(--color-black); font-weight:700; }
+.nav-item.sub { padding:8px 14px 8px 46px; font-size:13px; color:var(--color-dark-grey); }
+.nav-item.sub.active { color:var(--color-white); font-weight:700; background:var(--color-black); }
+.nav-item.sub .chev { margin-left:auto; color:var(--color-mid-grey); }
+
+.main { flex:1; padding:32px 40px; max-width:1600px; background:var(--color-white); }
+.page-header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:24px; }
+.hero-title { font-family:'Maersk Headline','Maersk Text',-apple-system,sans-serif;
+  font-weight:400; font-size:44px; line-height:1.0; margin:0 0 6px; color:var(--color-black); letter-spacing:-0.5px; }
+.hero-sub { font-size:14px; color:var(--color-mid-grey); margin:0; }
+.tabbar { display:flex; gap:28px; border-bottom:1px solid var(--color-light-grey); margin-bottom:28px; }
+.tab { padding:12px 2px; font-size:14px; color:var(--color-mid-grey); cursor:pointer;
+  border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; font-family:inherit; }
+.tab.active { color:var(--color-black); border-bottom-color:var(--color-maersk-blue); font-weight:700; }
+
+.controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:24px; }
+.control-label { font-size:12px; color:var(--color-mid-grey); margin-right:4px; }
+.segmented { display:inline-flex; background:var(--color-white); border:1px solid var(--color-light-grey);
+  border-radius:9999px; padding:3px; gap:2px; }
+.segmented button { border:none; background:transparent; font-family:inherit; padding:6px 14px; font-size:13px;
+  border-radius:9999px; color:var(--color-dark-grey); cursor:pointer; }
+.segmented button.active { background:var(--color-black); color:var(--color-white); font-weight:700; }
+.select { background:var(--color-white); border:1px solid var(--color-light-grey); border-radius:4px;
+  padding:8px 30px 8px 12px; font-size:13px; color:var(--color-dark-grey); font-family:inherit; min-width:140px;
+  appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236A6A6A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center; }
+.search-input { background:var(--color-white); border:1px solid var(--color-light-grey); border-radius:4px;
+  padding:8px 12px 8px 36px; font-size:13px; font-family:inherit; color:var(--color-dark-grey); width:280px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236A6A6A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:12px center; }
+.btn { padding:10px 20px; font-size:14px; font-weight:700; font-family:inherit; border-radius:4px; cursor:pointer; border:1px solid transparent; }
+.btn-primary { background:var(--color-dark-blue); color:var(--color-white); border-color:var(--color-dark-blue); }
+.btn-primary:hover { background:#002d47; }
+.btn-secondary { background:var(--color-white); color:var(--color-black); border-color:var(--color-light-grey); }
+.btn-secondary:hover { background:var(--color-bright-grey); }
+
+.card { background:var(--color-white); border:1px solid var(--color-light-grey); border-radius:6px; padding:24px; }
+.card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.card-title { font-size:18px; font-weight:700; margin:0; color:var(--color-black); }
+.card-sub { font-size:12px; color:var(--color-mid-grey); margin-top:2px; }
+
+.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.kpi-label { font-size:11px; text-transform:uppercase; letter-spacing:0.6px; color:var(--color-mid-grey); margin-bottom:10px; font-weight:700; }
+.kpi-value { font-family:'Maersk Headline','Maersk Text',sans-serif; font-size:32px; line-height:1.0; color:var(--color-black); font-weight:400; letter-spacing:-0.3px; }
+.kpi-delta { font-size:12px; margin-top:8px; display:inline-flex; align-items:center; gap:4px; }
+.kpi-delta.up { color:var(--color-status-success-text); }
+.kpi-delta.down { color:var(--color-status-error-text); }
+.kpi-delta.flat { color:var(--color-mid-grey); }
+.kpi-sub { font-size:12px; color:var(--color-mid-grey); margin-top:4px; }
+
+.pill { display:inline-flex; align-items:center; border-radius:9999px; padding:3px 10px; font-size:11px; font-weight:700; }
+.pill.success { background:var(--color-status-success-bg); color:var(--color-status-success-text); }
+.pill.warning { background:var(--color-status-warning-bg); color:var(--color-status-warning-text); }
+.pill.error   { background:var(--color-status-error-bg);   color:var(--color-status-error-text); }
+.pill.info    { background:var(--color-status-info-bg);    color:var(--color-status-info-text); }
+.pill.neutral { background:var(--color-status-neutral-bg); color:var(--color-status-neutral-text); }
+.id-chip { display:inline-block; background:var(--color-bright-grey); color:var(--color-dark-grey); border-radius:6px; padding:3px 10px; font-size:12px; font-family:'SF Mono','Menlo',monospace; }
+
+.table-wrap { overflow-x:auto; }
+table.mds-table { width:100%; border-collapse:collapse; }
+.mds-table thead th { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--color-mid-grey);
+  text-align:left; border-bottom:1px solid var(--color-light-grey); padding:10px 12px; white-space:nowrap; }
+.mds-table tbody td { font-size:13px; color:var(--color-dark-grey); padding:14px 12px; border-bottom:1px solid var(--color-bright-grey); vertical-align:middle; }
+.mds-table tbody tr:hover { background:var(--color-bright-grey); }
+.mds-table tbody tr:nth-child(even) td { background:#fafafa; }
+.mds-table tbody tr:nth-child(even):hover td { background:var(--color-bright-grey); }
+.col-id { font-family:'SF Mono','Menlo',monospace; color:var(--color-black); }
+.col-customer { color:var(--color-black); font-weight:700; }
+
+.filter-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.filter-pill { border:1px solid var(--color-light-grey); background:var(--color-white); color:var(--color-dark-grey);
+  border-radius:9999px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; gap:6px; }
+.filter-pill.active { background:var(--color-black); color:var(--color-white); border-color:var(--color-black); font-weight:700; }
+.filter-pill .count { opacity:0.7; font-size:12px; }
+
+/* ── Horizontal ranking bars (Biggest Customers / Lanes) ─── */
+.bar-row { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.bar-label { flex:0 0 140px; font-size:13px; color:var(--color-dark-grey); }
+.bar-track { flex:1; height:16px; background:var(--color-bright-grey); border-radius:9999px; overflow:hidden; }
+.bar-fill  { height:100%; background:var(--color-maersk-blue); border-radius:9999px; }
+.bar-value { flex:0 0 90px; text-align:right; font-size:13px; font-weight:700; color:var(--color-black); font-variant-numeric:tabular-nums; }
+
+/* ── Grouped vertical bar chart (Quote Activity) ─────────── */
+.bar-chart { display:flex; gap:8px; align-items:stretch; height:220px; padding:4px 0 0; }
+.bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.bar-col .bar-group { flex:1; width:100%; display:flex; gap:4px; align-items:flex-end; justify-content:center;
+  border-bottom:1px solid var(--color-light-grey); padding-bottom:2px; }
+.bar-rect { width:30px; border-radius:8px; display:flex; align-items:flex-start; justify-content:center;
+  color:var(--color-white); font-size:10px; font-weight:700; padding-top:6px; min-height:20px; }
+.bar-col .bar-xlabel { font-size:11px; color:var(--color-mid-grey); text-transform:uppercase; letter-spacing:0.4px; }
+
+/* ── Stacked vertical bar chart (Status Breakdown) ───────── */
+.stacked-chart { display:flex; gap:18px; align-items:stretch; height:240px; padding:4px 0 0; }
+.stacked-col-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.stacked-col-wrap .stacked-group { flex:1; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  border-bottom:1px solid var(--color-light-grey); padding-bottom:2px; }
+.stacked-col { width:44px; display:flex; flex-direction:column-reverse; gap:3px; }
+.stacked-seg { border-radius:6px; display:flex; align-items:flex-start; justify-content:center;
+  color:var(--color-white); font-size:10px; font-weight:700; padding-top:4px; min-height:16px; width:100%; }
+.stack-xlabel { font-size:11px; color:var(--color-mid-grey); text-transform:uppercase; letter-spacing:0.4px; }
+.stack-legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:11px; color:var(--color-dark-grey); }
+
+/* ── Line chart (Win Ratio Trend) ────────────────────────── */
+.line-chart { width:100%; height:260px; display:block; }
+.win-summary { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+.win-big { font-family:'Maersk Headline','Maersk Text',sans-serif; font-size:40px; font-weight:400; color:var(--color-black); line-height:1; letter-spacing:-0.5px; }
+.win-sub { font-size:13px; color:var(--color-mid-grey); }
+
+.legend { display:flex; gap:16px; font-size:12px; color:var(--color-dark-grey); flex-wrap:wrap; }
+.legend-dot { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:middle; }
+.legend-dot.current { background:var(--color-maersk-blue); }
+.legend-dot.prev    { background:var(--color-light-blue); }
+.legend-dot.team    { background:var(--color-maersk-blue); }
+.legend-dot.target  { background:#F3870C; }
+.legend-line { display:inline-block; width:14px; height:2px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+.legend-line.team   { background:var(--color-maersk-blue); }
+.legend-line.target { border-top:2px dashed #F3870C; background:transparent; height:0; }
+
+/* ── Sticky filter bar (Quotations view) ─────────────────── */
+.sticky-filters { position:sticky; top:64px; background:var(--color-white);
+  z-index:20; padding:16px 0 12px; margin-bottom:16px;
+  border-bottom:1px solid var(--color-light-grey); }
+.sticky-filters .controls { margin-bottom:16px; }
+.sticky-filters .filter-row { margin-bottom:0; }
+
+/* ── Date inputs for custom period ───────────────────────── */
+.date-input { background:var(--color-white); border:1px solid var(--color-light-grey); border-radius:4px;
+  padding:7px 10px; font-size:13px; font-family:inherit; color:var(--color-dark-grey); }
+
+/* ── SVG hover tooltip ───────────────────────────────────── */
+.line-chart .hit { cursor:pointer; }
+
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.metric-toggle { display:inline-flex; background:var(--color-bright-grey); border-radius:9999px; padding:2px; }
+.metric-toggle button { border:none; background:transparent; font-family:inherit; padding:4px 12px; font-size:12px; border-radius:9999px; color:var(--color-dark-grey); cursor:pointer; }
+.metric-toggle button.active { background:var(--color-white); color:var(--color-black); font-weight:700; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+
+.pagination { display:flex; justify-content:space-between; align-items:center; padding:14px 4px; font-size:13px; color:var(--color-mid-grey); }
+.pagination .pages { display:flex; gap:4px; }
+.pagination button { border:1px solid var(--color-light-grey); background:var(--color-white); color:var(--color-dark-grey);
+  padding:6px 12px; font-size:13px; border-radius:4px; cursor:pointer; font-family:inherit; }
+.pagination button:disabled { opacity:0.4; cursor:not-allowed; }
+`;
+
+// ─── Maersk Star ────────────────────────────────────────────────────────────
+const MaerskStar = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" aria-label="Maersk">
+    <polygon fill="#42B0D5"
+      points="50.00,2.00 58.68,31.98 87.53,20.07 69.50,45.55 96.80,60.68 65.64,62.47 70.83,93.25 50.00,70.00 29.17,93.25 34.36,62.47 3.20,60.68 30.50,45.55 12.47,20.07 41.32,31.98" />
+  </svg>
+);
+
+// ─── Icons ──────────────────────────────────────────────────────────────────
+const Icon = ({ name, size = 20 }) => {
+  const c = { width:size, height:size, viewBox:"0 0 24 24", fill:"none", stroke:"currentColor", strokeWidth:1.5, strokeLinecap:"round", strokeLinejoin:"round" };
+  switch (name) {
+    case "menu":     return (<svg {...c}><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>);
+    case "bell":     return (<svg {...c}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>);
+    case "home":     return (<svg {...c}><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-4v-6H10v6H6a2 2 0 0 1-2-2V10z"/></svg>);
+    case "dashboard":return (<svg {...c}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>);
+    case "email":    return (<svg {...c}><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>);
+    case "working":  return (<svg {...c}><path d="M4 4h12a4 4 0 0 1 4 4v12H4V4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>);
+    case "plane":    return (<svg {...c}><path d="M17.8 19.2 16 11l3.5-3.5a2.12 2.12 0 0 0-3-3L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>);
+    case "eye":      return (<svg {...c}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>);
+    case "monitor":  return (<svg {...c}><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>);
+    case "doc":      return (<svg {...c}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>);
+    case "receipt":  return (<svg {...c}><path d="M4 2h16v20l-3-2-3 2-3-2-3 2-4-2V2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>);
+    case "tag":      return (<svg {...c}><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>);
+    case "sparkle":  return (<svg {...c}><path d="M12 2l2.39 6.95L22 12l-7.61 3.05L12 22l-2.39-6.95L2 12l7.61-3.05z"/></svg>);
+    case "help":     return (<svg {...c}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>);
+    case "up":       return (<svg {...c}><polyline points="18 15 12 9 6 15"/></svg>);
+    case "down":     return (<svg {...c}><polyline points="6 9 12 15 18 9"/></svg>);
+    case "right":    return (<svg {...c}><polyline points="9 18 15 12 9 6"/></svg>);
+    case "arrow":    return (<svg {...c}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>);
+    case "download": return (<svg {...c}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>);
+    default: return null;
+  }
+};
+
+// ─── Mock data ──────────────────────────────────────────────────────────────
+const QUOTES = [
+  { id:"QFD-05341", customer:"Medtronic",         origin:"ORD", dest:"FRA", cw:4320,  amount:38400,  status:"Won",              owner:"Oliver M.", created:"2026-04-14", updated:"2026-04-17" },
+  { id:"QFD-05340", customer:"Boeing",            origin:"SEA", dest:"NRT", cw:12800, amount:142600, status:"Won",              owner:"Sarah K.",  created:"2026-04-14", updated:"2026-04-16" },
+  { id:"QFD-05338", customer:"Tesla",             origin:"SFO", dest:"SHA", cw:8100,  amount:94500,  status:"Won",              owner:"Oliver M.", created:"2026-04-13", updated:"2026-04-15" },
+  { id:"QFD-05335", customer:"Abbott Labs",       origin:"ATL", dest:"AMS", cw:2650,  amount:23100,  status:"Won",              owner:"Priya R.",  created:"2026-04-13", updated:"2026-04-15" },
+  { id:"QFD-05333", customer:"3M",                origin:"MSP", dest:"LHR", cw:3200,  amount:27800,  status:"Won",              owner:"James T.",  created:"2026-04-12", updated:"2026-04-14" },
+  { id:"QFD-05331", customer:"Honeywell",         origin:"DFW", dest:"HKG", cw:5700,  amount:62100,  status:"Won",              owner:"Sarah K.",  created:"2026-04-11", updated:"2026-04-13" },
+  { id:"QFD-05339", customer:"Intel",             origin:"SFO", dest:"ICN", cw:6900,  amount:74200,  status:"Lost",             owner:"James T.",  created:"2026-04-13", updated:"2026-04-16" },
+  { id:"QFD-05336", customer:"Caterpillar",       origin:"ORD", dest:"CDG", cw:4100,  amount:36200,  status:"Lost",             owner:"Priya R.",  created:"2026-04-13", updated:"2026-04-15" },
+  { id:"QFD-05330", customer:"Ford",              origin:"DTW", dest:"FRA", cw:7850,  amount:68900,  status:"Lost",             owner:"Oliver M.", created:"2026-04-10", updated:"2026-04-13" },
+  { id:"QFD-05329", customer:"Zebra Technologies",origin:"ORD", dest:"AMS", cw:1800,  amount:16200,  status:"Expired",          owner:"James T.",  created:"2026-04-08", updated:"2026-04-14" },
+  { id:"QFD-05327", customer:"Stryker",           origin:"GRR", dest:"FRA", cw:2100,  amount:18400,  status:"Expired",          owner:"Priya R.",  created:"2026-04-07", updated:"2026-04-13" },
+  { id:"QFD-05343", customer:"Johnson & Johnson", origin:"JFK", dest:"LHR", cw:3500,  amount:31200,  status:"Awaiting Customer",owner:"Sarah K.",  created:"2026-04-16", updated:"2026-04-16" },
+  { id:"QFD-05342", customer:"Pfizer",            origin:"PHL", dest:"BRU", cw:2900,  amount:26400,  status:"Awaiting Customer",owner:"Priya R.",  created:"2026-04-15", updated:"2026-04-15" },
+  { id:"QFD-05337", customer:"GE Aviation",       origin:"CVG", dest:"CDG", cw:6200,  amount:58100,  status:"Awaiting Customer",owner:"Oliver M.", created:"2026-04-13", updated:"2026-04-14" },
+  { id:"QFD-05346", customer:"Amazon Logistics",  origin:"LAX", dest:"NRT", cw:9400,  amount:108500, status:"Pending Approval", owner:"James T.",  created:"2026-04-18", updated:"2026-04-18" },
+  { id:"QFD-05345", customer:"Medtronic",         origin:"MIA", dest:"GRU", cw:3300,  amount:29800,  status:"Pending Approval", owner:"Oliver M.", created:"2026-04-17", updated:"2026-04-17" },
+  { id:"QFD-05344", customer:"Boeing",            origin:"SEA", dest:"NRT", cw:11200, amount:128700, status:"Pending Approval", owner:"Sarah K.",  created:"2026-04-17", updated:"2026-04-17" },
+  { id:"QFD-05334", customer:"Tesla",             origin:"SFO", dest:"SHA", cw:7600,  amount:88200,  status:"Pending Approval", owner:"Oliver M.", created:"2026-04-12", updated:"2026-04-13" },
+  { id:"QFD-05348", customer:"Nike",              origin:"PDX", dest:"AMS", cw:2400,  amount:21300,  status:"Draft",            owner:"Priya R.",  created:"2026-04-19", updated:"2026-04-19" },
+  { id:"QFD-05347", customer:"Lockheed Martin",   origin:"ATL", dest:"FRA", cw:4800,  amount:43100,  status:"Draft",            owner:"James T.",  created:"2026-04-18", updated:"2026-04-19" },
+];
+
+const STATUS_STYLE = {
+  "Won":"success", "Lost":"error", "Expired":"neutral",
+  "Awaiting Customer":"info", "Pending Approval":"warning", "Draft":"warning",
+};
+const ALL_STATUSES = ["Draft", "Pending Approval", "Awaiting Customer", "Won", "Lost", "Expired"];
+
+// Stacking order (bottom → top) + colors — muted blue + greys, red only for Lost
+const STATUS_ORDER = ["Won", "Awaiting Customer", "Pending Approval", "Lost", "Expired", "Draft"];
+const STATUS_COLORS = {
+  "Won":               "#003E62",   // dark-blue
+  "Awaiting Customer": "#1686BD",   // mid-blue
+  "Pending Approval":  "#A1D1E8",   // light-blue
+  "Lost":              "#EA5D4B",   // mid-red (keep for emphasis on losses)
+  "Expired":           "#6A6A6A",   // mid-grey
+  "Draft":             "#D4D4D4",   // light-grey
+};
+
+// Period-keyed data: different x-axis granularity for week/month/quarter/custom
+// Labels are arrays [top, bottom] so the chart renders weekday on top + date below.
+const TREND_DATA = {
+  week: {
+    winLabels: [
+      ["Mon","14 Apr 2026"],["Tue","15 Apr 2026"],["Wed","16 Apr 2026"],
+      ["Thu","17 Apr 2026"],["Fri","18 Apr 2026"],["Sat","19 Apr 2026"],["Sun","20 Apr 2026"],
+    ],
+    winTeam:   [45, 48, 50, 47, 49, 46, 48],
+    winTarget: [45, 45, 45, 45, 45, 45, 45],
+    activityLabels: [
+      ["Mon","14 Apr"],["Tue","15 Apr"],["Wed","16 Apr"],
+      ["Thu","17 Apr"],["Fri","18 Apr"],["Sat","19 Apr"],["Sun","20 Apr"],
+    ],
+    activity: {
+      count:   { a: [4, 5, 3, 6, 2, 0, 0],                              b: [3, 3, 4, 2, 4, 1, 1] },
+      tonnage: { a: [12, 15, 9, 18, 6, 0, 0],                           b: [9, 9, 12, 6, 12, 3, 3] },
+      revenue: { a: [120000, 150000, 90000, 180000, 60000, 0, 0],       b: [90000, 90000, 120000, 60000, 120000, 30000, 30000] },
+    },
+    statusLabels: [
+      ["Mon","14 Apr"],["Tue","15 Apr"],["Wed","16 Apr"],["Thu","17 Apr"],["Fri","18 Apr"],
+    ],
+    statusRows: [
+      { "Won":2, "Awaiting Customer":1, "Pending Approval":1, "Lost":0, "Expired":0, "Draft":0 },
+      { "Won":3, "Awaiting Customer":1, "Pending Approval":1, "Lost":1, "Expired":0, "Draft":0 },
+      { "Won":2, "Awaiting Customer":2, "Pending Approval":1, "Lost":1, "Expired":0, "Draft":0 },
+      { "Won":3, "Awaiting Customer":1, "Pending Approval":2, "Lost":1, "Expired":1, "Draft":0 },
+      { "Won":2, "Awaiting Customer":0, "Pending Approval":1, "Lost":0, "Expired":0, "Draft":1 },
+    ],
+  },
+  month: {
+    winLabels: [["W14","1–7 Apr"],["W15","8–14 Apr"],["W16","15–21 Apr"],["W17","22–28 Apr"]],
+    winTeam:   [42, 46, 49, 48],
+    winTarget: [45, 45, 45, 45],
+    activityLabels: [["W14","1–7 Apr"],["W15","8–14 Apr"],["W16","15–21 Apr"],["W17","22–28 Apr"]],
+    activity: {
+      count:   { a: [22, 25, 30, 28],                           b: [18, 22, 24, 25] },
+      tonnage: { a: [66, 75, 90, 84],                           b: [54, 66, 72, 75] },
+      revenue: { a: [660000, 750000, 900000, 840000],           b: [540000, 660000, 720000, 750000] },
+    },
+    statusLabels: [["W14","1–7 Apr"],["W15","8–14 Apr"],["W16","15–21 Apr"],["W17","22–28 Apr"]],
+    statusRows: [
+      { "Won":10, "Awaiting Customer":3, "Pending Approval":4, "Lost":3, "Expired":1, "Draft":1 },
+      { "Won":12, "Awaiting Customer":4, "Pending Approval":5, "Lost":2, "Expired":2, "Draft":2 },
+      { "Won":14, "Awaiting Customer":5, "Pending Approval":6, "Lost":4, "Expired":1, "Draft":2 },
+      { "Won":11, "Awaiting Customer":6, "Pending Approval":4, "Lost":3, "Expired":2, "Draft":3 },
+    ],
+  },
+  quarter: {
+    winLabels: [["Feb","2026"],["Mar","2026"],["Apr","2026"]],
+    winTeam:   [41, 45, 48],
+    winTarget: [45, 45, 45],
+    activityLabels: [["Feb","2026"],["Mar","2026"],["Apr","2026"]],
+    activity: {
+      count:   { a: [85, 110, 95],                              b: [70, 90, 105] },
+      tonnage: { a: [255, 330, 285],                            b: [210, 270, 315] },
+      revenue: { a: [2550000, 3300000, 2850000],                b: [2100000, 2700000, 3150000] },
+    },
+    statusLabels: [["Feb","2026"],["Mar","2026"],["Apr","2026"]],
+    statusRows: [
+      { "Won":35, "Awaiting Customer":10, "Pending Approval":14, "Lost":12, "Expired":4,  "Draft":6  },
+      { "Won":44, "Awaiting Customer":14, "Pending Approval":18, "Lost":10, "Expired":6,  "Draft":8  },
+      { "Won":40, "Awaiting Customer":16, "Pending Approval":15, "Lost":12, "Expired":5,  "Draft":7  },
+    ],
+  },
+  custom: {
+    winLabels: [["D1","Day 1"],["D2","Day 2"],["D3","Day 3"],["D4","Day 4"],["D5","Day 5"]],
+    winTeam:   [44, 47, 45, 49, 48],
+    winTarget: [45, 45, 45, 45, 45],
+    activityLabels: [["D1","Day 1"],["D2","Day 2"],["D3","Day 3"],["D4","Day 4"],["D5","Day 5"]],
+    activity: {
+      count:   { a: [3, 5, 2, 6, 4],                            b: [2, 4, 3, 3, 5] },
+      tonnage: { a: [9, 15, 6, 18, 12],                         b: [6, 12, 9, 9, 15] },
+      revenue: { a: [90000, 150000, 60000, 180000, 120000],     b: [60000, 120000, 90000, 90000, 150000] },
+    },
+    statusLabels: [["D1","Day 1"],["D2","Day 2"],["D3","Day 3"],["D4","Day 4"],["D5","Day 5"]],
+    statusRows: [
+      { "Won":2, "Awaiting Customer":1, "Pending Approval":1, "Lost":1, "Expired":0, "Draft":0 },
+      { "Won":3, "Awaiting Customer":2, "Pending Approval":2, "Lost":1, "Expired":0, "Draft":0 },
+      { "Won":1, "Awaiting Customer":1, "Pending Approval":1, "Lost":0, "Expired":1, "Draft":0 },
+      { "Won":3, "Awaiting Customer":2, "Pending Approval":2, "Lost":1, "Expired":0, "Draft":1 },
+      { "Won":2, "Awaiting Customer":1, "Pending Approval":1, "Lost":1, "Expired":0, "Draft":0 },
+    ],
+  },
+};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+const fmtMoney = (n) => "$" + n.toLocaleString("en-US", { maximumFractionDigits:0 });
+const fmtKg    = (n) => n.toLocaleString("en-US") + " kg";
+const fmtShort = (n, m) => m === "revenue" ? fmtMoney(n) : m === "tonnage" ? fmtKg(n) : n.toLocaleString("en-US");
+
+const aggregate = (rows, key, metric) => {
+  const acc = new Map();
+  rows.forEach(r => {
+    const k = key === "lane" ? `${r.origin} → ${r.dest}` : r[key];
+    const v = metric === "revenue" ? r.amount : metric === "tonnage" ? r.cw : 1;
+    acc.set(k, (acc.get(k) || 0) + v);
+  });
+  return [...acc.entries()].map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value).slice(0, 5);
+};
+
+// ─── Small components ──────────────────────────────────────────────────────
+function KpiTile({ label, value, delta, deltaSuffix = "%", sub }) {
+  const has = typeof delta === "number";
+  const up = has && delta > 0.1, down = has && delta < -0.1;
+  const cls = up ? "up" : down ? "down" : "flat";
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value}</div>
+      {has && (
+        <div className={"kpi-delta " + cls}>
+          <Icon name={up ? "up" : down ? "down" : "arrow"} size={12} />
+          {Math.abs(delta).toFixed(1)}{deltaSuffix} vs prior
+        </div>
+      )}
+      {sub && <div className="kpi-sub">{sub}</div>}
+    </div>
+  );
+}
+
+function MetricToggle({ value, onChange }) {
+  return (
+    <div className="metric-toggle">
+      <button className={value === "revenue" ? "active" : ""} onClick={() => onChange("revenue")}>$</button>
+      <button className={value === "tonnage" ? "active" : ""} onClick={() => onChange("tonnage")}>Tonnage</button>
+      <button className={value === "count"   ? "active" : ""} onClick={() => onChange("count")}>Count</button>
+    </div>
+  );
+}
+
+// ─── Chart components ──────────────────────────────────────────────────────
+
+// Responsive SVG line chart — Team line + dashed target line, hover reveals value
+function LineChart({ labels, team, target, yMax = 60, yMin = 0, yStep = 10 }) {
+  const [hover, setHover] = useState(null);
+  const W = 1200, H = 260;
+  const pad = { l: 60, r: 28, t: 18, b: 56 };
+  const innerW = W - pad.l - pad.r;
+  const innerH = H - pad.t - pad.b;
+  const n = labels.length;
+  const stepX = n > 1 ? innerW / (n - 1) : 0;
+  const yScale = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin)) * innerH;
+  const xAt = (i) => pad.l + i * stepX;
+
+  const ticks = [];
+  for (let v = yMin; v <= yMax; v += yStep) ticks.push(v);
+
+  const pathFor = (vals) => vals.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yScale(v)}`).join(" ");
+
+  return (
+    <svg className="line-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img">
+      {ticks.map((v) => {
+        const y = yScale(v);
+        return (
+          <g key={v}>
+            <line x1={pad.l} x2={W - pad.r} y1={y} y2={y} stroke="#F0F0F0" strokeWidth="1" />
+            <text x={pad.l - 12} y={y + 5} fontSize="13" fill="#6A6A6A" textAnchor="end">{v}%</text>
+          </g>
+        );
+      })}
+      <line x1={pad.l} x2={W - pad.r} y1={H - pad.b} y2={H - pad.b} stroke="#D4D4D4" strokeWidth="1" />
+      {labels.map((lbl, i) => {
+        const [top, bottom] = Array.isArray(lbl) ? lbl : [lbl, ""];
+        return (
+          <g key={i}>
+            <text x={xAt(i)} y={H - pad.b + 20} fontSize="13" fontWeight="700" fill="#363636" textAnchor="middle">{top}</text>
+            {bottom && <text x={xAt(i)} y={H - pad.b + 38} fontSize="11" fill="#6A6A6A" textAnchor="middle">{bottom}</text>}
+          </g>
+        );
+      })}
+
+      {/* Target (dashed, Maersk orange) */}
+      <path d={pathFor(target)} fill="none" stroke="#F3870C" strokeWidth="2" strokeDasharray="6 5" />
+
+      {/* Team line (solid, Maersk blue) */}
+      <path d={pathFor(team)} fill="none" stroke="#42B0D5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Dots + invisible larger hit targets for hover tooltip */}
+      {team.map((v, i) => (
+        <g key={i}>
+          <circle cx={xAt(i)} cy={yScale(v)} r="5" fill="#FFFFFF" stroke="#42B0D5" strokeWidth="2.5" />
+          <circle className="hit" cx={xAt(i)} cy={yScale(v)} r="22" fill="transparent"
+            onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
+        </g>
+      ))}
+
+      {/* Hover tooltip */}
+      {hover !== null && (() => {
+        const v = team[hover], x = xAt(hover), y = yScale(v);
+        const tipY = y - 42 < 4 ? y + 18 : y - 42;
+        return (
+          <g pointerEvents="none">
+            <line x1={x} x2={x} y1={pad.t} y2={H - pad.b} stroke="#D4D4D4" strokeWidth="1" strokeDasharray="2 3" />
+            <rect x={x - 32} y={tipY} width="64" height="32" rx="4" fill="#141414" />
+            <text x={x} y={tipY + 21} fontSize="14" fontWeight="700" fill="#FFFFFF" textAnchor="middle">{v}%</text>
+          </g>
+        );
+      })()}
+    </svg>
+  );
+}
+
+// Render a two-line x-axis label (top bold, bottom muted) if `lbl` is an array
+function TwoLineLabel({ lbl }) {
+  if (Array.isArray(lbl)) {
+    return (
+      <>
+        <div>{lbl[0]}</div>
+        {lbl[1] && <div style={{ fontSize: "10px", color: "var(--color-mid-grey)", marginTop: 2, textTransform: "none", letterSpacing: 0 }}>{lbl[1]}</div>}
+      </>
+    );
+  }
+  return lbl;
+}
+
+// Grouped vertical bar chart — Quote Activity (This Week vs Last Week)
+function GroupedBars({ labels, seriesA, seriesB, colorA = "#42B0D5", colorB = "#A1D1E8", formatValue = (v) => String(v) }) {
+  const max = Math.max(...seriesA, ...seriesB, 1);
+  return (
+    <div className="bar-chart">
+      {labels.map((lbl, i) => {
+        const aH = (seriesA[i] / max) * 100;
+        const bH = (seriesB[i] / max) * 100;
+        return (
+          <div className="bar-col" key={i}>
+            <div className="bar-group">
+              <div className="bar-rect" style={{ height: `${Math.max(bH, 8)}%`, background: colorB, color: "#003E62" }}>{formatValue(seriesB[i])}</div>
+              <div className="bar-rect" style={{ height: `${Math.max(aH, 8)}%`, background: colorA }}>{formatValue(seriesA[i])}</div>
+            </div>
+            <div className="bar-xlabel"><TwoLineLabel lbl={lbl} /></div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Stacked vertical bar chart — Status Breakdown over weeks
+function StackedBars({ labels, rows, order, colors }) {
+  const totals = rows.map(r => order.reduce((s, k) => s + (r[k] || 0), 0));
+  const max = Math.max(...totals, 1);
+  return (
+    <div className="stacked-chart">
+      {labels.map((lbl, i) => {
+        const total = totals[i];
+        const colH = (total / max) * 100;
+        return (
+          <div className="stacked-col-wrap" key={i}>
+            <div className="stacked-group">
+              <div className="stacked-col" style={{ height: `${colH}%` }}>
+                {order.map(k => {
+                  const v = rows[i][k] || 0;
+                  if (!v) return null;
+                  const h = (v / total) * 100;
+                  return (
+                    <div key={k} className="stacked-seg" style={{ height: `${h}%`, background: colors[k] }} title={`${k}: ${v}`}>
+                      {v >= 2 ? v : ""}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="stack-xlabel"><TwoLineLabel lbl={lbl} /></div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Dashboard view ────────────────────────────────────────────────────────
+function Dashboard() {
+  const [range, setRange] = useState("week");
+  const [scope, setScope] = useState("team");
+  const [custMetric, setCustMetric] = useState("revenue");
+  const [laneMetric, setLaneMetric] = useState("revenue");
+  const [actMetric,  setActMetric]  = useState("count");
+  const [customFrom, setCustomFrom] = useState("2026-04-14");
+  const [customTo,   setCustomTo]   = useState("2026-04-18");
+
+  const rows = useMemo(() => {
+    const byDate = (r) => range === "week" ? r.created >= "2026-04-13" : true;
+    const byScope = (r) => scope === "mine" ? r.owner === "Oliver M." : true;
+    return QUOTES.filter(r => byDate(r) && byScope(r));
+  }, [range, scope]);
+
+  const quotesCreated = rows.length;
+  const quotesPrev = range === "week" ? 18 : range === "month" ? 74 : range === "quarter" ? 210 : 12;
+  const quotesDelta = ((quotesCreated - quotesPrev) / quotesPrev) * 100;
+
+  const closed = rows.filter(r => ["Won","Lost","Expired"].includes(r.status));
+  const won = rows.filter(r => r.status === "Won").length;
+  const winRatio = closed.length ? (won / closed.length) * 100 : 0;
+  const topCustomers = useMemo(() => aggregate(rows, "customer", custMetric), [rows, custMetric]);
+  const topLanes     = useMemo(() => aggregate(rows, "lane",     laneMetric), [rows, laneMetric]);
+
+  const custMax = Math.max(...topCustomers.map(c => c.value), 1);
+  const laneMax = Math.max(...topLanes.map(l => l.value), 1);
+
+  const trend = TREND_DATA[range];
+  const activityBucket =
+    range === "week"    ? "day" :
+    range === "month"   ? "week" :
+    range === "quarter" ? "month" :
+                          "day (custom range)";
+  const activityNoun =
+    actMetric === "revenue" ? "Quoted value" :
+    actMetric === "tonnage" ? "Chargeable weight" :
+                              "Quotes created";
+  const activitySubtitle = `${activityNoun} per ${activityBucket}`;
+  const fmtActivity = (v) => {
+    if (actMetric === "count")   return String(v);
+    if (actMetric === "tonnage") return v === 0 ? "0" : `${v}t`;
+    if (v === 0) return "$0";
+    if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+    return `$${Math.round(v / 1000)}K`;
+  };
+  const statusSubtitle =
+    range === "week"    ? "Last 5 days · by count" :
+    range === "month"   ? "Last 4 weeks · by count" :
+    range === "quarter" ? "Last 3 months · by count" :
+                          "Custom range · by count";
+  const winSubtitle =
+    range === "week"    ? "7-day rolling · team vs 45% target" :
+    range === "month"   ? "4-week rolling · team vs 45% target" :
+    range === "quarter" ? "3-month rolling · team vs 45% target" :
+                          "Custom range · team vs 45% target";
+  const activityLegend =
+    range === "week"    ? { a: "This Week",    b: "Last Week" }    :
+    range === "month"   ? { a: "This Month",   b: "Last Month" }   :
+    range === "quarter" ? { a: "This Quarter", b: "Last Quarter" } :
+                          { a: "Selected",     b: "Prior" };
+  const comparisonLabel =
+    range === "week"    ? "last week" :
+    range === "month"   ? "last month" :
+    range === "quarter" ? "last quarter" :
+                          "prior period";
+
+  return (
+    <>
+      <div className="controls">
+        <span className="control-label">Period</span>
+        <div className="segmented">
+          <button className={range === "week"    ? "active" : ""} onClick={() => setRange("week")}>This Week</button>
+          <button className={range === "month"   ? "active" : ""} onClick={() => setRange("month")}>This Month</button>
+          <button className={range === "quarter" ? "active" : ""} onClick={() => setRange("quarter")}>This Quarter</button>
+          <button className={range === "custom"  ? "active" : ""} onClick={() => setRange("custom")}>Custom</button>
+        </div>
+        {range === "custom" && (
+          <>
+            <input type="date" className="date-input" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+            <span className="control-label" style={{ margin: 0 }}>to</span>
+            <input type="date" className="date-input" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+          </>
+        )}
+        <span className="control-label" style={{ marginLeft: 20 }}>Scope</span>
+        <select className="select" value={scope} onChange={(e) => setScope(e.target.value)}>
+          <option value="mine">My Quotes</option>
+          <option value="team">NAM Team</option>
+          <option value="all">All Regions</option>
+        </select>
+        <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--color-mid-grey)" }}>
+          Comparing to <strong style={{ color: "var(--color-dark-grey)" }}>{comparisonLabel}</strong>
+        </div>
+      </div>
+
+      {/* KPI row (3 tiles — Win Ratio gets its own trend card below) */}
+      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        <KpiTile label="Quotes Created"       value={quotesCreated.toString()} delta={quotesDelta} deltaSuffix="%" sub={`vs ${quotesPrev} prior period`} />
+        <KpiTile label="Open Quotes"          value={rows.filter(r => ["Draft","Pending Approval","Awaiting Customer"].includes(r.status)).length.toString()} sub="Draft · Pending · Awaiting" />
+        <KpiTile label="Total Tonnage Quoted" value={(rows.reduce((s, r) => s + r.cw, 0) / 1000).toFixed(1) + " t"} sub="Chargeable weight" />
+      </div>
+
+      {/* Win Ratio Trend — full width line chart */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <div>
+            <h3 className="card-title">Win Ratio Trend</h3>
+            <div className="card-sub">{winSubtitle}</div>
+          </div>
+          <div className="legend">
+            <span><span className="legend-line team" /> NAM Team</span>
+            <span><span className="legend-line target" /> Target (45%)</span>
+          </div>
+        </div>
+        <div className="win-summary">
+          <span className="win-big">{winRatio.toFixed(1)}%</span>
+          <span className="win-sub">current period · {won} won / {closed.length} closed</span>
+        </div>
+        <LineChart labels={trend.winLabels} team={trend.winTeam} target={trend.winTarget} yMax={60} yMin={0} yStep={15} />
+      </div>
+
+      {/* Quote Activity + Status Breakdown */}
+      <div className="grid-2" style={{ marginBottom: 16 }}>
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Quote Activity</h3>
+              <div className="card-sub">{activitySubtitle}</div>
+            </div>
+            <MetricToggle value={actMetric} onChange={setActMetric} />
+          </div>
+          <GroupedBars
+            labels={trend.activityLabels}
+            seriesA={trend.activity[actMetric].a}
+            seriesB={trend.activity[actMetric].b}
+            formatValue={fmtActivity}
+          />
+          <div className="stack-legend">
+            <span><span className="legend-dot current" /> {activityLegend.a}</span>
+            <span><span className="legend-dot prev" /> {activityLegend.b}</span>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Status Breakdown</h3>
+              <div className="card-sub">{statusSubtitle}</div>
+            </div>
+          </div>
+          <StackedBars labels={trend.statusLabels} rows={trend.statusRows} order={STATUS_ORDER} colors={STATUS_COLORS} />
+          <div className="stack-legend">
+            {STATUS_ORDER.map(k => (
+              <span key={k}><span className="legend-dot" style={{ background: STATUS_COLORS[k] }} />{k}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Rankings — rounded pill bars, independent metric toggles */}
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Biggest Customers</h3>
+              <div className="card-sub">Top 5 by {custMetric === "revenue" ? "quoted value" : custMetric === "tonnage" ? "chargeable weight" : "quote count"}</div>
+            </div>
+            <MetricToggle value={custMetric} onChange={setCustMetric} />
+          </div>
+          {topCustomers.map(c => (
+            <div className="bar-row" key={c.name}>
+              <div className="bar-label">{c.name}</div>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${(c.value / custMax) * 100}%` }} /></div>
+              <div className="bar-value">{fmtShort(c.value, custMetric)}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Biggest Lanes</h3>
+              <div className="card-sub">Top 5 by {laneMetric === "revenue" ? "quoted value" : laneMetric === "tonnage" ? "chargeable weight" : "quote count"}</div>
+            </div>
+            <MetricToggle value={laneMetric} onChange={setLaneMetric} />
+          </div>
+          {topLanes.map(l => (
+            <div className="bar-row" key={l.name}>
+              <div className="bar-label" style={{ fontFamily: "'SF Mono','Menlo',monospace", fontSize: 13 }}>{l.name}</div>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${(l.value / laneMax) * 100}%`, background: "var(--color-mid-blue)" }} /></div>
+              <div className="bar-value">{fmtShort(l.value, laneMetric)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Quotations view ───────────────────────────────────────────────────────
+function Quotations() {
+  const [search, setSearch] = useState("");
+  const [statuses, setStatuses] = useState([]);
+  const [owner, setOwner] = useState("all");
+  const [sortBy, setSortBy] = useState("updated-desc");
+
+  const owners = useMemo(() => ["all", ...Array.from(new Set(QUOTES.map(q => q.owner)))], []);
+
+  const rows = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    let out = QUOTES.filter(q => {
+      const matchS = !s || q.id.toLowerCase().includes(s) || q.customer.toLowerCase().includes(s) || q.origin.toLowerCase().includes(s) || q.dest.toLowerCase().includes(s);
+      const matchStatus = !statuses.length || statuses.includes(q.status);
+      const matchOwner = owner === "all" || q.owner === owner;
+      return matchS && matchStatus && matchOwner;
+    });
+    const [k, dir] = sortBy.split("-");
+    const mult = dir === "asc" ? 1 : -1;
+    out = [...out].sort((a, b) => {
+      const av = a[k], bv = b[k];
+      if (av < bv) return -1 * mult;
+      if (av > bv) return  1 * mult;
+      return 0;
+    });
+    return out;
+  }, [search, statuses, owner, sortBy]);
+
+  const toggleStatus = (s) => setStatuses(cur => cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s]);
+  const statusCounts = Object.fromEntries(ALL_STATUSES.map(s => [s, QUOTES.filter(q => q.status === s).length]));
+
+  return (
+    <>
+      <div className="sticky-filters">
+        <div className="controls">
+          <input className="search-input" placeholder="Search by ID, customer, or lane" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="select" value={owner} onChange={(e) => setOwner(e.target.value)}>
+            {owners.map(o => <option key={o} value={o}>{o === "all" ? "All Owners" : o}</option>)}
+          </select>
+          <select className="select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="updated-desc">Recently Updated</option>
+            <option value="created-desc">Newest Created</option>
+            <option value="created-asc">Oldest Created</option>
+            <option value="customer-asc">Customer A–Z</option>
+            <option value="amount-desc">Highest Value</option>
+          </select>
+          <div style={{ marginLeft: "auto", fontSize: 13, color: "var(--color-mid-grey)" }}>
+            {rows.length} of {QUOTES.length} quotes
+          </div>
+        </div>
+
+        <div className="filter-row">
+          <button className={"filter-pill" + (statuses.length === 0 ? " active" : "")} onClick={() => setStatuses([])}>
+            All <span className="count">{QUOTES.length}</span>
+          </button>
+          {ALL_STATUSES.map(s => (
+            <button key={s} className={"filter-pill" + (statuses.includes(s) ? " active" : "")} onClick={() => toggleStatus(s)}>
+              {s} <span className="count">{statusCounts[s]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="table-wrap">
+          <table className="mds-table">
+            <thead>
+              <tr>
+                <th>Quote ID</th>
+                <th>Customer</th>
+                <th>Origin → Destination</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Updated</th>
+                <th>Owner</th>
+                <th style={{ textAlign: "right" }}>Quoted Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(q => (
+                <tr key={q.id}>
+                  <td className="col-id">{q.id}</td>
+                  <td className="col-customer">{q.customer}</td>
+                  <td><span className="id-chip">{q.origin} → {q.dest}</span></td>
+                  <td><span className={"pill " + STATUS_STYLE[q.status]}>{q.status}</span></td>
+                  <td>{q.created}</td>
+                  <td>{q.updated}</td>
+                  <td>{q.owner}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtMoney(q.amount)}</td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={8} style={{ textAlign:"center", padding:40, color:"var(--color-mid-grey)" }}>No quotes match these filters.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="pagination" style={{ padding: "14px 20px", borderTop: "1px solid var(--color-light-grey)" }}>
+          <div>Showing 1–{rows.length} of {rows.length}</div>
+          <div className="pages">
+            <button disabled>Previous</button>
+            <button disabled>Next</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── App ───────────────────────────────────────────────────────────────────
+function App() {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  return (
+    <div className="mds-app">
+      <style>{tokens + styles}</style>
+
+      <div className="topbar">
+        <div className="topbar-left">
+          <button className="icon-btn" aria-label="Menu"><Icon name="menu" /></button>
+          <MaerskStar size={28} />
+          <span className="app-name">One Platform</span>
+        </div>
+        <div className="topbar-right">
+          <button className="icon-btn" aria-label="Notifications"><Icon name="bell" /></button>
+          <div className="avatar">BA</div>
+        </div>
+      </div>
+
+      <div className="shell">
+        <nav className="sidebar" aria-label="Primary">
+          <div className="nav-item"><Icon name="home" /> Home</div>
+          <div className="nav-item"><Icon name="dashboard" /> Dashboard</div>
+
+          <div className="nav-divider" />
+
+          <div className="nav-item"><Icon name="email" /> Email Tasks</div>
+          <div className="nav-item"><Icon name="working" /> Working Sheet</div>
+          <div className="nav-item"><Icon name="plane" /> Air Gateway</div>
+          <div className="nav-item"><Icon name="eye" /> Shipment &amp; Milestone</div>
+          <div className="nav-item">
+            <Icon name="monitor" /> <span className="label">Business Monitor</span>
+            <span className="chev"><Icon name="up" size={14} /></span>
+          </div>
+          <div className="nav-item sub">Loss Making Approval</div>
+          <div className="nav-item"><Icon name="doc" /> Document Center</div>
+          <div className="nav-item">
+            <Icon name="receipt" /> <span className="label">Accounting</span>
+            <span className="chev"><Icon name="up" size={14} /></span>
+          </div>
+          <div className="nav-item sub">Tax Invoice - AIR<span className="chev"><Icon name="down" size={14} /></span></div>
+          <div className="nav-item sub">Tax Invoice - LCL<span className="chev"><Icon name="down" size={14} /></span></div>
+          <div className="nav-item"><Icon name="tag" /> Pricing</div>
+
+          {/* Air Spot Quote — new module */}
+          <div className={"nav-item parent" + (activeTab === "dashboard" || activeTab === "quotations" ? " has-active" : "")}>
+            <Icon name="sparkle" /> <span className="label">Air Spot Quote</span>
+            <span className="chev"><Icon name="up" size={14} /></span>
+          </div>
+          <div className={"nav-item sub" + (activeTab === "dashboard"  ? " active" : "")} onClick={() => setActiveTab("dashboard")}>Dashboard</div>
+          <div className={"nav-item sub" + (activeTab === "quotations" ? " active" : "")} onClick={() => setActiveTab("quotations")}>Quotations</div>
+
+          <div className="nav-divider" />
+
+          <div className="nav-item">
+            <Icon name="doc" /> <span className="label">ALP Modules</span>
+            <span className="chev"><Icon name="down" size={14} /></span>
+          </div>
+
+          <div className="nav-divider" />
+
+          <div className="nav-item"><Icon name="help" /> About</div>
+        </nav>
+
+        <main className="main">
+          <div className="page-header">
+            <div>
+              <h1 className="hero-title">{activeTab === "dashboard" ? "Dashboard" : "Quotations"}</h1>
+              <p className="hero-sub">Air Spot Quote · NAM Region</p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-secondary"><Icon name="download" size={14} />&nbsp; Export</button>
+              <button className="btn btn-primary">+&nbsp; New Quote</button>
+            </div>
+          </div>
+
+          {activeTab === "dashboard" ? <Dashboard /> : <Quotations />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ─── Password gate (preview only — not real security) ─────────────────────
+function Gate({ children }) {
+  const [unlocked, setUnlocked] = useState(false);
+  const [input, setInput] = useState("");
+  const [error, setError] = useState(false);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (input === "test") { setUnlocked(true); setError(false); }
+    else { setError(true); }
+  };
+
+  if (unlocked) return children;
+
+  return (
+    <div className="mds-app" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bright-grey)" }}>
+      <style>{tokens + styles}</style>
+      <form onSubmit={submit} style={{
+        background: "var(--color-white)", border: "1px solid var(--color-light-grey)",
+        borderRadius: 8, padding: 36, width: 380,
+        boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <MaerskStar size={32} />
+          <span style={{ fontSize: 16, color: "var(--color-black)" }}>One Platform</span>
+        </div>
+        <h1 style={{
+          fontFamily: "'Maersk Headline','Maersk Text',sans-serif",
+          fontSize: 28, fontWeight: 400, margin: "0 0 6px", letterSpacing: "-0.3px",
+        }}>Air Spot Quote</h1>
+        <p style={{ fontSize: 13, color: "var(--color-mid-grey)", margin: "0 0 20px" }}>
+          Enter the password to continue.
+        </p>
+        <label style={{ fontSize: 12, color: "var(--color-mid-grey)", textTransform: "uppercase", letterSpacing: "0.6px", fontWeight: 700, display: "block", marginBottom: 6 }}>
+          Password
+        </label>
+        <input
+          type="password"
+          autoFocus
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setError(false); }}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            fontSize: 14,
+            fontFamily: "inherit",
+            color: "var(--color-dark-grey)",
+            background: "var(--color-white)",
+            border: "1px solid " + (error ? "var(--color-status-error-border)" : "var(--color-light-grey)"),
+            borderRadius: 4,
+          }}
+        />
+        {error && (
+          <div style={{ fontSize: 12, color: "var(--color-status-error-text)", marginTop: 6 }}>
+            Incorrect password. Please try again.
+          </div>
+        )}
+        <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 20 }}>
+          Unlock
+        </button>
+      </form>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Gate><App /></Gate>);
+</script>
+</body>
+</html>
