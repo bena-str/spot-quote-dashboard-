@@ -1049,16 +1049,14 @@ function App() {
   );
 }
 
-// ─── Password gate (preview only — not real security) ─────────────────────
+// ─── Preview gate (no password — press Enter or click Continue) ───────────
 function Gate({ children }) {
   const [unlocked, setUnlocked] = useState(false);
   const [input, setInput] = useState("");
-  const [error, setError] = useState(false);
 
   const submit = (e) => {
     e.preventDefault();
-    if (input === "test") { setUnlocked(true); setError(false); }
-    else { setError(true); }
+    setUnlocked(true);
   };
 
   if (unlocked) return children;
@@ -1080,7 +1078,7 @@ function Gate({ children }) {
           fontSize: 28, fontWeight: 400, margin: "0 0 6px", letterSpacing: "-0.3px",
         }}>Air Spot Quote</h1>
         <p style={{ fontSize: 13, color: "var(--color-mid-grey)", margin: "0 0 20px" }}>
-          Enter the password to continue.
+          Press Enter or click Continue to open the preview.
         </p>
         <label style={{ fontSize: 12, color: "var(--color-mid-grey)", textTransform: "uppercase", letterSpacing: "0.6px", fontWeight: 700, display: "block", marginBottom: 6 }}>
           Password
@@ -1089,7 +1087,7 @@ function Gate({ children }) {
           type="password"
           autoFocus
           value={input}
-          onChange={(e) => { setInput(e.target.value); setError(false); }}
+          onChange={(e) => setInput(e.target.value)}
           style={{
             width: "100%",
             padding: "10px 12px",
@@ -1097,17 +1095,12 @@ function Gate({ children }) {
             fontFamily: "inherit",
             color: "var(--color-dark-grey)",
             background: "var(--color-white)",
-            border: "1px solid " + (error ? "var(--color-status-error-border)" : "var(--color-light-grey)"),
+            border: "1px solid var(--color-light-grey)",
             borderRadius: 4,
           }}
         />
-        {error && (
-          <div style={{ fontSize: 12, color: "var(--color-status-error-text)", marginTop: 6 }}>
-            Incorrect password. Please try again.
-          </div>
-        )}
         <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 20 }}>
-          Unlock
+          Continue
         </button>
       </form>
     </div>
