@@ -151,8 +151,15 @@ table.mds-table { width:100%; border-collapse:collapse; }
 .bar-row { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
 .bar-label { flex:0 0 140px; font-size:13px; color:var(--color-dark-grey); }
 .bar-track { flex:1; height:16px; background:var(--color-bright-grey); border-radius:9999px; overflow:hidden; }
-.bar-fill  { height:100%; background:var(--color-maersk-blue); border-radius:9999px; }
-.bar-value { flex:0 0 90px; text-align:right; font-size:13px; font-weight:700; color:var(--color-black); font-variant-numeric:tabular-nums; }
+.bar-fill  { height:100%; background:var(--color-maersk-blue); border-radius:9999px; display:flex; overflow:hidden; }
+.bar-seg   { height:100%; min-width:0; }
+.bar-seg.won { background:#42B0D5; }
+.bar-seg.non { background:#A1D1E8; }
+.bar-seg.lane-won { background:#003E62; }
+.bar-seg.lane-non { background:#7FB4D0; }
+.bar-value { flex:0 0 130px; text-align:right; font-size:13px; color:var(--color-dark-grey); font-variant-numeric:tabular-nums; }
+.bar-value strong { color:var(--color-black); font-weight:700; }
+.bar-value .split { color:var(--color-mid-grey); font-size:12px; font-weight:500; margin-left:4px; }
 .rank-scroll { max-height:280px; overflow-y:auto; padding-right:6px; margin-right:-6px; }
 .rank-scroll::-webkit-scrollbar { width:6px; }
 .rank-scroll::-webkit-scrollbar-thumb { background:var(--color-light-grey); border-radius:3px; }
@@ -160,12 +167,13 @@ table.mds-table { width:100%; border-collapse:collapse; }
 .rank-scroll .bar-row:last-child { margin-bottom:0; }
 
 /* ── Grouped vertical bar chart (Quote Activity) ─────────── */
-.bar-chart { display:flex; gap:8px; align-items:stretch; height:220px; padding:4px 0 0; }
+.bar-chart { display:flex; gap:8px; align-items:stretch; height:240px; padding:4px 0 0; }
 .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
 .bar-col .bar-group { flex:1; width:100%; display:flex; gap:4px; align-items:flex-end; justify-content:center;
   border-bottom:1px solid var(--color-light-grey); padding-bottom:2px; }
-.bar-rect { width:30px; border-radius:8px; display:flex; align-items:flex-start; justify-content:center;
-  color:var(--color-white); font-size:10px; font-weight:700; padding-top:6px; min-height:20px; }
+.bar-stack { width:30px; display:flex; flex-direction:column-reverse; border-radius:8px; overflow:hidden; min-height:20px; }
+.bar-stack-seg { width:100%; display:flex; align-items:center; justify-content:center;
+  color:var(--color-white); font-size:10px; font-weight:700; padding-top:0; min-height:0; }
 .bar-col .bar-xlabel { font-size:11px; color:var(--color-mid-grey); text-transform:uppercase; letter-spacing:0.4px; }
 
 /* ── Stacked vertical bar chart (Status Breakdown) ───────── */
@@ -180,7 +188,10 @@ table.mds-table { width:100%; border-collapse:collapse; }
 .stack-legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:11px; color:var(--color-dark-grey); }
 
 /* ── Line chart (Win Ratio Trend) ────────────────────────── */
-.line-chart { width:100%; height:260px; display:block; }
+.line-chart { width:100%; height:300px; display:block; }
+.line-chart rect.bar-hit { cursor:default; transition: opacity 120ms ease; }
+.line-chart rect.bar-hit:hover { opacity: 1; }
+.line-chart .hit { cursor:default; }
 .win-summary { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
 .win-big { font-family:'Maersk Headline','Maersk Text',sans-serif; font-size:40px; font-weight:400; color:var(--color-black); line-height:1; letter-spacing:-0.5px; }
 .win-sub { font-size:13px; color:var(--color-mid-grey); }
@@ -192,7 +203,7 @@ table.mds-table { width:100%; border-collapse:collapse; }
 .legend-dot.team    { background:var(--color-maersk-blue); }
 .legend-dot.target  { background:#F3870C; }
 .legend-line { display:inline-block; width:14px; height:2px; border-radius:2px; margin-right:6px; vertical-align:middle; }
-.legend-line.team   { background:var(--color-maersk-blue); }
+.legend-line.team   { background:var(--color-dark-blue); }
 .legend-line.target { border-top:2px dashed #F3870C; background:transparent; height:0; }
 
 /* ── Sticky filter bar (Quotations view) ─────────────────── */
@@ -302,12 +313,21 @@ const ALL_STATUSES = ["Draft", "Pending Approval", "Awaiting Customer", "Won", "
 // Stacking order (bottom → top) + colors — muted blue + greys, red only for Lost
 const STATUS_ORDER = ["Won", "Awaiting Customer", "Pending Approval", "Lost", "Expired", "Draft"];
 const STATUS_COLORS = {
-  "Won":               "#003E62",   // dark-blue
+  "Won":               "#6CA926",   // MDS success green
   "Awaiting Customer": "#1686BD",   // mid-blue
   "Pending Approval":  "#A1D1E8",   // light-blue
   "Lost":              "#EA5D4B",   // mid-red (keep for emphasis on losses)
   "Expired":           "#6A6A6A",   // mid-grey
   "Draft":             "#D4D4D4",   // light-grey
+};
+
+// AI Handling stack — best outcome at bottom (Dark Blue) → failure at top (red)
+const AI_ORDER  = ["Auto-answered", "No edits", "Edited", "Failed"];
+const AI_COLORS = {
+  "Auto-answered": "#003E62",   // Dark Blue  — end-to-end automated customer response
+  "No edits":      "#42B0D5",   // Maersk Blue — AI generated, agent accepted as-is
+  "Edited":        "#A1D1E8",   // Light Blue  — AI generated, agent tweaked before send
+  "Failed":        "#EA5D4B",   // Red         — AI fell back, agent built manually
 };
 
 // Period-keyed data: different x-axis granularity for week/month/quarter/custom
@@ -320,6 +340,8 @@ const TREND_DATA = {
     ],
     winTeam:   [45, 48, 50, 47, 49, 46, 48],
     winTarget: [45, 45, 45, 45, 45, 45, 45],
+    winWon:    [ 9, 12, 14, 14, 17, 13, 15],
+    winNonWon: [11, 13, 14, 16, 18, 15, 16],
     activityLabels: [
       ["Mon","14 Apr"],["Tue","15 Apr"],["Wed","16 Apr"],
       ["Thu","17 Apr"],["Fri","18 Apr"],["Sat","19 Apr"],["Sun","20 Apr"],
@@ -330,7 +352,8 @@ const TREND_DATA = {
       revenue: { a: [120000, 150000, 90000, 180000, 60000, 0, 0],       b: [90000, 90000, 120000, 60000, 120000, 30000, 30000] },
     },
     statusLabels: [
-      ["Mon","14 Apr"],["Tue","15 Apr"],["Wed","16 Apr"],["Thu","17 Apr"],["Fri","18 Apr"],
+      ["Mon","14 Apr"],["Tue","15 Apr"],["Wed","16 Apr"],["Thu","17 Apr"],
+      ["Fri","18 Apr"],["Sat","19 Apr"],["Sun","20 Apr"],
     ],
     statusRows: [
       { "Won":2, "Awaiting Customer":1, "Pending Approval":1, "Lost":0, "Expired":0, "Draft":0 },
@@ -338,12 +361,27 @@ const TREND_DATA = {
       { "Won":2, "Awaiting Customer":2, "Pending Approval":1, "Lost":1, "Expired":0, "Draft":0 },
       { "Won":3, "Awaiting Customer":1, "Pending Approval":2, "Lost":1, "Expired":1, "Draft":0 },
       { "Won":2, "Awaiting Customer":0, "Pending Approval":1, "Lost":0, "Expired":0, "Draft":1 },
+      { "Won":1, "Awaiting Customer":0, "Pending Approval":0, "Lost":1, "Expired":0, "Draft":0 },
+      { "Won":2, "Awaiting Customer":1, "Pending Approval":0, "Lost":0, "Expired":0, "Draft":0 },
+    ],
+    turnMedian: [52, 48, 62, 42, 55, 71, 58],
+    turnTarget: [60, 60, 60, 60, 60, 60, 60],
+    aiRows: [
+      { "Auto-answered":1, "No edits":2, "Edited":1, "Failed":0 },
+      { "Auto-answered":1, "No edits":2, "Edited":1, "Failed":1 },
+      { "Auto-answered":0, "No edits":2, "Edited":1, "Failed":0 },
+      { "Auto-answered":2, "No edits":3, "Edited":1, "Failed":0 },
+      { "Auto-answered":0, "No edits":1, "Edited":1, "Failed":0 },
+      { "Auto-answered":0, "No edits":0, "Edited":0, "Failed":0 },
+      { "Auto-answered":0, "No edits":0, "Edited":0, "Failed":0 },
     ],
   },
   month: {
     winLabels: [["W14","1–7 Apr"],["W15","8–14 Apr"],["W16","15–21 Apr"],["W17","22–28 Apr"]],
     winTeam:   [42, 46, 49, 48],
     winTarget: [45, 45, 45, 45],
+    winWon:    [38, 46, 54, 53],
+    winNonWon: [52, 54, 56, 58],
     activityLabels: [["W14","1–7 Apr"],["W15","8–14 Apr"],["W16","15–21 Apr"],["W17","22–28 Apr"]],
     activity: {
       count:   { a: [22, 25, 30, 28],                           b: [18, 22, 24, 25] },
@@ -357,11 +395,21 @@ const TREND_DATA = {
       { "Won":14, "Awaiting Customer":5, "Pending Approval":6, "Lost":4, "Expired":1, "Draft":2 },
       { "Won":11, "Awaiting Customer":6, "Pending Approval":4, "Lost":3, "Expired":2, "Draft":3 },
     ],
+    turnMedian: [58, 54, 49, 51],
+    turnTarget: [60, 60, 60, 60],
+    aiRows: [
+      { "Auto-answered":4, "No edits":10, "Edited": 7, "Failed":1 },
+      { "Auto-answered":5, "No edits":12, "Edited": 6, "Failed":2 },
+      { "Auto-answered":7, "No edits":15, "Edited": 7, "Failed":1 },
+      { "Auto-answered":6, "No edits":14, "Edited": 7, "Failed":1 },
+    ],
   },
   quarter: {
     winLabels: [["Feb","2026"],["Mar","2026"],["Apr","2026"]],
     winTeam:   [41, 45, 48],
     winTarget: [45, 45, 45],
+    winWon:    [102, 135, 150],
+    winNonWon: [148, 165, 163],
     activityLabels: [["Feb","2026"],["Mar","2026"],["Apr","2026"]],
     activity: {
       count:   { a: [85, 110, 95],                              b: [70, 90, 105] },
@@ -374,11 +422,20 @@ const TREND_DATA = {
       { "Won":44, "Awaiting Customer":14, "Pending Approval":18, "Lost":10, "Expired":6,  "Draft":8  },
       { "Won":40, "Awaiting Customer":16, "Pending Approval":15, "Lost":12, "Expired":5,  "Draft":7  },
     ],
+    turnMedian: [65, 58, 51],
+    turnTarget: [60, 60, 60],
+    aiRows: [
+      { "Auto-answered":12, "No edits":40, "Edited":28, "Failed":5 },
+      { "Auto-answered":20, "No edits":55, "Edited":30, "Failed":5 },
+      { "Auto-answered":18, "No edits":50, "Edited":25, "Failed":2 },
+    ],
   },
   custom: {
     winLabels: [["D1","Day 1"],["D2","Day 2"],["D3","Day 3"],["D4","Day 4"],["D5","Day 5"]],
     winTeam:   [44, 47, 45, 49, 48],
     winTarget: [45, 45, 45, 45, 45],
+    winWon:    [11, 14, 13, 17, 16],
+    winNonWon: [14, 16, 16, 18, 17],
     activityLabels: [["D1","Day 1"],["D2","Day 2"],["D3","Day 3"],["D4","Day 4"],["D5","Day 5"]],
     activity: {
       count:   { a: [3, 5, 2, 6, 4],                            b: [2, 4, 3, 3, 5] },
@@ -393,6 +450,15 @@ const TREND_DATA = {
       { "Won":3, "Awaiting Customer":2, "Pending Approval":2, "Lost":1, "Expired":0, "Draft":1 },
       { "Won":2, "Awaiting Customer":1, "Pending Approval":1, "Lost":1, "Expired":0, "Draft":0 },
     ],
+    turnMedian: [55, 48, 52, 46, 50],
+    turnTarget: [60, 60, 60, 60, 60],
+    aiRows: [
+      { "Auto-answered":1, "No edits":1, "Edited":1, "Failed":0 },
+      { "Auto-answered":1, "No edits":2, "Edited":1, "Failed":1 },
+      { "Auto-answered":0, "No edits":1, "Edited":1, "Failed":0 },
+      { "Auto-answered":2, "No edits":3, "Edited":1, "Failed":0 },
+      { "Auto-answered":1, "No edits":2, "Edited":1, "Failed":0 },
+    ],
   },
 };
 
@@ -406,9 +472,12 @@ const aggregate = (rows, key, metric, limit = 5) => {
   rows.forEach(r => {
     const k = key === "lane" ? `${r.origin} → ${r.dest}` : r[key];
     const v = metric === "revenue" ? r.amount : metric === "tonnage" ? r.cw : 1;
-    acc.set(k, (acc.get(k) || 0) + v);
+    const cur = acc.get(k) || { won: 0, nonWon: 0 };
+    if (r.status === "Won") cur.won += v; else cur.nonWon += v;
+    acc.set(k, cur);
   });
-  const sorted = [...acc.entries()].map(([name, value]) => ({ name, value }))
+  const sorted = [...acc.entries()]
+    .map(([name, { won, nonWon }]) => ({ name, won, nonWon, value: won + nonWon }))
     .sort((a, b) => b.value - a.value);
   return limit ? sorted.slice(0, limit) : sorted;
 };
@@ -446,68 +515,156 @@ function MetricToggle({ value, onChange }) {
 // ─── Chart components ──────────────────────────────────────────────────────
 
 // Responsive SVG line chart — Team line + dashed target line, hover reveals value
-function LineChart({ labels, team, target, yMax = 60, yMin = 0, yStep = 10 }) {
+function LineChart({
+  labels, team, target, won, nonWon,
+  yMax = 60, yMin = 0, yStep = 10,
+  yFormat = (v) => `${v}%`,          // left-axis tick + tooltip title format
+  leftAxisTitle = "Win %",           // shown top-left above first tick
+  metricLabel = "Win Ratio",         // tooltip subtitle for the line dot
+}) {
+  // hover: { i: number, type: "line" | "won" | "non" }
   const [hover, setHover] = useState(null);
-  const W = 1200, H = 260;
-  const pad = { l: 60, r: 28, t: 18, b: 56 };
+  const W = 1200, H = 340;
+  const pad = { l: 72, r: 76, t: 48, b: 72 };
   const innerW = W - pad.l - pad.r;
   const innerH = H - pad.t - pad.b;
   const n = labels.length;
-  const stepX = n > 1 ? innerW / (n - 1) : 0;
-  const yScale = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin)) * innerH;
-  const xAt = (i) => pad.l + i * stepX;
+
+  // Right (secondary) axis — only if stacked-bar data is supplied
+  const hasBars = Array.isArray(won) && Array.isArray(nonWon);
+  const rawMax  = hasBars ? Math.max(...won.map((w, i) => w + nonWon[i]), 1) : 0;
+  const niceUpFor4 = (v) => {
+    const tgt = v * 1.05;
+    const steps = [1, 2, 5, 10, 15, 20, 25, 30, 50, 75, 100, 150, 200, 250, 500, 1000];
+    for (const s of steps) if (s * 4 >= tgt) return s * 4;
+    return Math.ceil(tgt / 4000) * 4000;
+  };
+  const niceMax = hasBars ? niceUpFor4(rawMax) : 0;
+
+  // Inset the first/last buckets from the axes so bars and axis labels don't collide
+  const xInset = 56;
+  const stepX  = n > 1 ? (innerW - 2 * xInset) / (n - 1) : 0;
+  const xAt    = (i) => pad.l + xInset + i * stepX;
+
+  const yScale  = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin)) * innerH;
+  const yScaleR = (v) => pad.t + (1 - v / niceMax) * innerH;
+  const barW    = Math.min(52, Math.max(22, stepX * 0.42));
 
   const ticks = [];
   for (let v = yMin; v <= yMax; v += yStep) ticks.push(v);
 
   const pathFor = (vals) => vals.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yScale(v)}`).join(" ");
 
+  // Tooltip content driven by hover type
+  const tooltip = (() => {
+    if (!hover) return null;
+    const { i, type } = hover;
+    const x = xAt(i);
+    if (type === "line")  return { x, cy: yScale(team[i]),                   title: yFormat(team[i]),    sub: metricLabel };
+    if (type === "won")   return { x, cy: yScaleR(won[i] / 2),               title: `${won[i]} Won`,     sub: "Quotes won this period" };
+    if (type === "non") {
+      const mid = won[i] + nonWon[i] / 2;
+      return { x, cy: yScaleR(mid), title: `${nonWon[i]} Non-won`, sub: "Lost · Expired · Cancelled" };
+    }
+    return null;
+  })();
+
   return (
     <svg className="line-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img">
+      {/* Axis titles (kept well above first tick) */}
+      <text x={pad.l - 12} y={22} fontSize="12" fontWeight="700" fill="#6A6A6A" textAnchor="end" style={{ textTransform: "uppercase", letterSpacing: "0.6px" }}>{leftAxisTitle}</text>
+      {hasBars && <text x={W - pad.r + 12} y={22} fontSize="12" fontWeight="700" fill="#6A6A6A" textAnchor="start" style={{ textTransform: "uppercase", letterSpacing: "0.6px" }}>Closed</text>}
+
+      {/* Horizontal gridlines + left/right tick labels */}
       {ticks.map((v) => {
         const y = yScale(v);
+        const ratio = (v - yMin) / (yMax - yMin);
         return (
           <g key={v}>
             <line x1={pad.l} x2={W - pad.r} y1={y} y2={y} stroke="#F0F0F0" strokeWidth="1" />
-            <text x={pad.l - 12} y={y + 5} fontSize="13" fill="#6A6A6A" textAnchor="end">{v}%</text>
+            <text x={pad.l - 12} y={y + 5} fontSize="13" fill="#6A6A6A" textAnchor="end">{yFormat(v)}</text>
+            {hasBars && <text x={W - pad.r + 12} y={y + 5} fontSize="13" fill="#6A6A6A" textAnchor="start">{Math.round(niceMax * ratio)}</text>}
           </g>
         );
       })}
       <line x1={pad.l} x2={W - pad.r} y1={H - pad.b} y2={H - pad.b} stroke="#D4D4D4" strokeWidth="1" />
+
+      {/* Stacked bars — hoverable per segment */}
+      {hasBars && won.map((w, i) => {
+        const total = w + nonWon[i];
+        const x = xAt(i) - barW / 2;
+        const topY     = yScaleR(total);
+        const wonStart = yScaleR(w);
+        const axisY    = H - pad.b;
+        const wonH     = Math.max(0, axisY - wonStart);
+        const nonH     = Math.max(0, wonStart - topY);
+        const isHoverWon = hover && hover.i === i && hover.type === "won";
+        const isHoverNon = hover && hover.i === i && hover.type === "non";
+        return (
+          <g key={i}>
+            <rect className="bar-hit" x={x} y={topY} width={barW} height={nonH}
+              fill="#A1D1E8" rx="3" opacity={isHoverNon ? 1 : 0.9}
+              onMouseEnter={() => setHover({ i, type: "non" })}
+              onMouseLeave={() => setHover(null)}
+            >
+              <title>{`${nonWon[i]} Non-won`}</title>
+            </rect>
+            <rect className="bar-hit" x={x} y={wonStart} width={barW} height={wonH}
+              fill="#42B0D5" rx="3" opacity={isHoverWon ? 1 : 0.9}
+              onMouseEnter={() => setHover({ i, type: "won" })}
+              onMouseLeave={() => setHover(null)}
+            >
+              <title>{`${won[i]} Won`}</title>
+            </rect>
+          </g>
+        );
+      })}
+
+      {/* X labels (two-line: weekday + date) */}
       {labels.map((lbl, i) => {
         const [top, bottom] = Array.isArray(lbl) ? lbl : [lbl, ""];
         return (
           <g key={i}>
-            <text x={xAt(i)} y={H - pad.b + 20} fontSize="13" fontWeight="700" fill="#363636" textAnchor="middle">{top}</text>
-            {bottom && <text x={xAt(i)} y={H - pad.b + 38} fontSize="11" fill="#6A6A6A" textAnchor="middle">{bottom}</text>}
+            <text x={xAt(i)} y={H - pad.b + 24} fontSize="13" fontWeight="700" fill="#363636" textAnchor="middle">{top}</text>
+            {bottom && <text x={xAt(i)} y={H - pad.b + 44} fontSize="11" fill="#6A6A6A" textAnchor="middle">{bottom}</text>}
           </g>
         );
       })}
 
       {/* Target (dashed, Maersk orange) */}
-      <path d={pathFor(target)} fill="none" stroke="#F3870C" strokeWidth="2" strokeDasharray="6 5" />
+      <path d={pathFor(target)} fill="none" stroke="#F3870C" strokeWidth="2" strokeDasharray="6 5" pointerEvents="none" />
 
-      {/* Team line (solid, Maersk blue) */}
-      <path d={pathFor(team)} fill="none" stroke="#42B0D5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Team win-ratio line (Dark Blue) */}
+      <path d={pathFor(team)} fill="none" stroke="#003E62" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
 
-      {/* Dots + invisible larger hit targets for hover tooltip */}
-      {team.map((v, i) => (
-        <g key={i}>
-          <circle cx={xAt(i)} cy={yScale(v)} r="5" fill="#FFFFFF" stroke="#42B0D5" strokeWidth="2.5" />
-          <circle className="hit" cx={xAt(i)} cy={yScale(v)} r="22" fill="transparent"
-            onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
-        </g>
-      ))}
+      {/* Line dots + compact hit targets (small so they don't eat into bar hover) */}
+      {team.map((v, i) => {
+        const isHover = hover && hover.i === i && hover.type === "line";
+        return (
+          <g key={i}>
+            <circle cx={xAt(i)} cy={yScale(v)} r={isHover ? 6 : 5}
+              fill="#FFFFFF" stroke="#003E62" strokeWidth="2.5" pointerEvents="none" />
+            <circle className="hit" cx={xAt(i)} cy={yScale(v)} r="11" fill="transparent"
+              onMouseEnter={() => setHover({ i, type: "line" })}
+              onMouseLeave={() => setHover(null)}>
+              <title>{`${yFormat(v)} ${metricLabel}`}</title>
+            </circle>
+          </g>
+        );
+      })}
 
-      {/* Hover tooltip */}
-      {hover !== null && (() => {
-        const v = team[hover], x = xAt(hover), y = yScale(v);
-        const tipY = y - 42 < 4 ? y + 18 : y - 42;
+      {/* Hover tooltip — content depends on which element is hovered */}
+      {tooltip && (() => {
+        const { x, cy, title, sub } = tooltip;
+        const tipW = 150, tipH = 44;
+        const tipX = Math.max(pad.l, Math.min(W - pad.r - tipW, x - tipW / 2));
+        const tipY = Math.max(4, cy - tipH - 12);
         return (
           <g pointerEvents="none">
-            <line x1={x} x2={x} y1={pad.t} y2={H - pad.b} stroke="#D4D4D4" strokeWidth="1" strokeDasharray="2 3" />
-            <rect x={x - 32} y={tipY} width="64" height="32" rx="4" fill="#141414" />
-            <text x={x} y={tipY + 21} fontSize="14" fontWeight="700" fill="#FFFFFF" textAnchor="middle">{v}%</text>
+            <line x1={x} x2={x} y1={pad.t} y2={H - pad.b} stroke="#A0A0A0" strokeWidth="1" strokeDasharray="2 3" />
+            <rect x={tipX} y={tipY} width={tipW} height={tipH} rx="4" fill="#141414" />
+            <text x={tipX + tipW / 2} y={tipY + 19} fontSize="14" fontWeight="700" fill="#FFFFFF" textAnchor="middle">{title}</text>
+            <text x={tipX + tipW / 2} y={tipY + 35} fontSize="11" fill="#A1D1E8" textAnchor="middle">{sub}</text>
           </g>
         );
       })()}
@@ -528,19 +685,49 @@ function TwoLineLabel({ lbl }) {
   return lbl;
 }
 
-// Grouped vertical bar chart — Quote Activity (This Week vs Last Week)
-function GroupedBars({ labels, seriesA, seriesB, colorA = "#42B0D5", colorB = "#A1D1E8", formatValue = (v) => String(v) }) {
-  const max = Math.max(...seriesA, ...seriesB, 1);
+// Grouped vertical bar chart — Quote Activity (This period vs prior period, each split into Won / Non-won)
+// seriesA / seriesB each: { won: number[], nonWon: number[] }
+function GroupedBars({
+  labels,
+  seriesA, seriesB,
+  colorAWon = "#42B0D5", colorANon = "#A1D1E8",  // current period — blue shades
+  colorBWon = "#6A6A6A", colorBNon = "#D4D4D4",  // prior period — grey shades
+  formatValue = (v) => String(v),
+}) {
+  const aTot = seriesA.won.map((w, i) => w + seriesA.nonWon[i]);
+  const bTot = seriesB.won.map((w, i) => w + seriesB.nonWon[i]);
+  const max = Math.max(...aTot, ...bTot, 1);
+
+  const Bar = ({ won, nonWon, heightPct, wonColor, nonColor, textOnLight }) => {
+    const total = won + nonWon;
+    const wonPct = total ? (won / total) * 100 : 0;
+    const nonPct = total ? (nonWon / total) * 100 : 0;
+    return (
+      <div className="bar-stack" style={{ height: `${Math.max(heightPct, 8)}%` }}>
+        {nonWon > 0 && (
+          <div className="bar-stack-seg" style={{ height: `${nonPct}%`, background: nonColor, color: textOnLight ? "#003E62" : "#FFFFFF" }}>
+            {nonPct >= 18 ? formatValue(nonWon) : ""}
+          </div>
+        )}
+        {won > 0 && (
+          <div className="bar-stack-seg" style={{ height: `${wonPct}%`, background: wonColor, color: "#FFFFFF" }}>
+            {wonPct >= 18 ? formatValue(won) : ""}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="bar-chart">
       {labels.map((lbl, i) => {
-        const aH = (seriesA[i] / max) * 100;
-        const bH = (seriesB[i] / max) * 100;
+        const aH = (aTot[i] / max) * 100;
+        const bH = (bTot[i] / max) * 100;
         return (
           <div className="bar-col" key={i}>
             <div className="bar-group">
-              <div className="bar-rect" style={{ height: `${Math.max(bH, 8)}%`, background: colorB, color: "#003E62" }}>{formatValue(seriesB[i])}</div>
-              <div className="bar-rect" style={{ height: `${Math.max(aH, 8)}%`, background: colorA }}>{formatValue(seriesA[i])}</div>
+              <Bar won={seriesB.won[i]} nonWon={seriesB.nonWon[i]} heightPct={bH} wonColor={colorBWon} nonColor={colorBNon} textOnLight />
+              <Bar won={seriesA.won[i]} nonWon={seriesA.nonWon[i]} heightPct={aH} wonColor={colorAWon} nonColor={colorANon} textOnLight />
             </div>
             <div className="bar-xlabel"><TwoLineLabel lbl={lbl} /></div>
           </div>
@@ -551,11 +738,11 @@ function GroupedBars({ labels, seriesA, seriesB, colorA = "#42B0D5", colorB = "#
 }
 
 // Stacked vertical bar chart — Status Breakdown over weeks
-function StackedBars({ labels, rows, order, colors }) {
+function StackedBars({ labels, rows, order, colors, height }) {
   const totals = rows.map(r => order.reduce((s, k) => s + (r[k] || 0), 0));
   const max = Math.max(...totals, 1);
   return (
-    <div className="stacked-chart">
+    <div className="stacked-chart" style={height ? { height } : undefined}>
       {labels.map((lbl, i) => {
         const total = totals[i];
         const colH = (total / max) * 100;
@@ -625,6 +812,17 @@ function Dashboard() {
   const laneMax = Math.max(...topLanes.map(l => l.value), 1);
 
   const trend = TREND_DATA[range];
+
+  // Derive Won / Non-won split for each Activity bar from the same win-ratio trend.
+  const splitActivity = (arr, ratioPct) => {
+    const won = arr.map((v, i) => Math.round(v * (ratioPct[i] || 0) / 100));
+    return { won, nonWon: arr.map((v, i) => Math.max(0, v - won[i])) };
+  };
+  const currRatio = trend.winTeam;
+  const prevRatio = trend.winTeam.map(p => Math.max(28, p - 6));
+  const activityA = splitActivity(trend.activity[actMetric].a, currRatio);
+  const activityB = splitActivity(trend.activity[actMetric].b, prevRatio);
+
   const activityBucket =
     range === "week"    ? "day" :
     range === "month"   ? "week" :
@@ -643,7 +841,7 @@ function Dashboard() {
     return `$${Math.round(v / 1000)}K`;
   };
   const statusSubtitle =
-    range === "week"    ? "Last 5 days · by count" :
+    range === "week"    ? "Last 7 days · by count" :
     range === "month"   ? "Last 4 weeks · by count" :
     range === "quarter" ? "Last 3 months · by count" :
                           "Custom range · by count";
@@ -662,6 +860,25 @@ function Dashboard() {
     range === "month"   ? "last month" :
     range === "quarter" ? "last quarter" :
                           "prior period";
+
+  // Turnaround Time summary
+  const turnAvg = trend.turnMedian.length
+    ? Math.round(trend.turnMedian.reduce((s, v) => s + v, 0) / trend.turnMedian.length)
+    : 0;
+  const turnBelowTarget = trend.turnMedian.filter(v => v <= 60).length;
+  const turnBelowPct    = trend.turnMedian.length
+    ? Math.round((turnBelowTarget / trend.turnMedian.length) * 100)
+    : 0;
+
+  // AI Handling summary
+  const aiTotals = AI_ORDER.reduce((acc, k) => {
+    acc[k] = trend.aiRows.reduce((s, r) => s + (r[k] || 0), 0);
+    return acc;
+  }, {});
+  const aiTotal          = AI_ORDER.reduce((s, k) => s + aiTotals[k], 0);
+  const aiFullyAutomated = aiTotals["Auto-answered"] + aiTotals["No edits"];
+  const aiAutomatedPct   = aiTotal ? Math.round((aiFullyAutomated / aiTotal) * 100) : 0;
+  const aiFailedPct      = aiTotal ? Math.round((aiTotals["Failed"] / aiTotal) * 100) : 0;
 
   return (
     <>
@@ -758,7 +975,9 @@ function Dashboard() {
             <div className="card-sub">{winSubtitle}</div>
           </div>
           <div className="legend">
-            <span><span className="legend-line team" /> NAM Team</span>
+            <span><span className="legend-dot" style={{ background: "#42B0D5" }} /> Won</span>
+            <span><span className="legend-dot" style={{ background: "#A1D1E8" }} /> Non-won</span>
+            <span><span className="legend-line team" /> Win % (NAM Team)</span>
             <span><span className="legend-line target" /> Target (45%)</span>
           </div>
         </div>
@@ -766,7 +985,7 @@ function Dashboard() {
           <span className="win-big">{winRatio.toFixed(1)}%</span>
           <span className="win-sub">current period · {won} won / {closed.length} closed</span>
         </div>
-        <LineChart labels={trend.winLabels} team={trend.winTeam} target={trend.winTarget} yMax={60} yMin={0} yStep={15} />
+        <LineChart labels={trend.winLabels} team={trend.winTeam} target={trend.winTarget} won={trend.winWon} nonWon={trend.winNonWon} yMax={60} yMin={0} yStep={15} />
       </div>
 
       {/* Quote Activity + Status Breakdown */}
@@ -781,13 +1000,15 @@ function Dashboard() {
           </div>
           <GroupedBars
             labels={trend.activityLabels}
-            seriesA={trend.activity[actMetric].a}
-            seriesB={trend.activity[actMetric].b}
+            seriesA={activityA}
+            seriesB={activityB}
             formatValue={fmtActivity}
           />
           <div className="stack-legend">
-            <span><span className="legend-dot current" /> {activityLegend.a}</span>
-            <span><span className="legend-dot prev" /> {activityLegend.b}</span>
+            <span><span className="legend-dot" style={{ background: "#42B0D5" }} /> {activityLegend.a} · Won</span>
+            <span><span className="legend-dot" style={{ background: "#A1D1E8" }} /> {activityLegend.a} · Non-won</span>
+            <span><span className="legend-dot" style={{ background: "#6A6A6A" }} /> {activityLegend.b} · Won</span>
+            <span><span className="legend-dot" style={{ background: "#D4D4D4" }} /> {activityLegend.b} · Non-won</span>
           </div>
         </div>
 
@@ -821,13 +1042,22 @@ function Dashboard() {
             {topCustomers.map(c => (
               <div className="bar-row" key={c.name}>
                 <div className="bar-label">{c.name}</div>
-                <div className="bar-track"><div className="bar-fill" style={{ width: `${(c.value / custMax) * 100}%` }} /></div>
-                <div className="bar-value">{fmtShort(c.value, custMetric)}</div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{ width: `${(c.value / custMax) * 100}%` }}>
+                    {c.won    > 0 && <div className="bar-seg won" style={{ flex: c.won }}    title={`Won: ${fmtShort(c.won, custMetric)}`} />}
+                    {c.nonWon > 0 && <div className="bar-seg non" style={{ flex: c.nonWon }} title={`Non-won: ${fmtShort(c.nonWon, custMetric)}`} />}
+                  </div>
+                </div>
+                <div className="bar-value"><strong>{fmtShort(c.value, custMetric)}</strong><span className="split"> · {fmtShort(c.won, custMetric)} won</span></div>
               </div>
             ))}
             {topCustomers.length === 0 && (
               <div style={{ padding: 24, textAlign: "center", color: "var(--color-mid-grey)", fontSize: 13 }}>No customers match these filters.</div>
             )}
+          </div>
+          <div className="stack-legend">
+            <span><span className="legend-dot" style={{ background: "#42B0D5" }} /> Won</span>
+            <span><span className="legend-dot" style={{ background: "#A1D1E8" }} /> Non-won (Open · Lost · Expired)</span>
           </div>
         </div>
 
@@ -843,13 +1073,76 @@ function Dashboard() {
             {topLanes.map(l => (
               <div className="bar-row" key={l.name}>
                 <div className="bar-label" style={{ fontFamily: "'SF Mono','Menlo',monospace", fontSize: 13 }}>{l.name}</div>
-                <div className="bar-track"><div className="bar-fill" style={{ width: `${(l.value / laneMax) * 100}%`, background: "var(--color-mid-blue)" }} /></div>
-                <div className="bar-value">{fmtShort(l.value, laneMetric)}</div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{ width: `${(l.value / laneMax) * 100}%` }}>
+                    {l.won    > 0 && <div className="bar-seg lane-won" style={{ flex: l.won }}    title={`Won: ${fmtShort(l.won, laneMetric)}`} />}
+                    {l.nonWon > 0 && <div className="bar-seg lane-non" style={{ flex: l.nonWon }} title={`Non-won: ${fmtShort(l.nonWon, laneMetric)}`} />}
+                  </div>
+                </div>
+                <div className="bar-value"><strong>{fmtShort(l.value, laneMetric)}</strong><span className="split"> · {fmtShort(l.won, laneMetric)} won</span></div>
               </div>
             ))}
             {topLanes.length === 0 && (
               <div style={{ padding: 24, textAlign: "center", color: "var(--color-mid-grey)", fontSize: 13 }}>No lanes match these filters.</div>
             )}
+          </div>
+          <div className="stack-legend">
+            <span><span className="legend-dot" style={{ background: "#003E62" }} /> Won</span>
+            <span><span className="legend-dot" style={{ background: "#7FB4D0" }} /> Non-won (Open · Lost · Expired)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Turnaround Time + AI Handling */}
+      <div className="grid-2" style={{ marginTop: 16 }}>
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Turnaround Time</h3>
+              <div className="card-sub">Median time from request received to quote sent · per {activityBucket}</div>
+            </div>
+            <div className="legend">
+              <span><span className="legend-line team" /> Median</span>
+              <span><span className="legend-line target" /> SLA (60 min)</span>
+            </div>
+          </div>
+          <div className="win-summary">
+            <span className="win-big">{turnAvg} min</span>
+            <span className="win-sub">period avg · {turnBelowPct}% of buckets under 60-min SLA</span>
+          </div>
+          <LineChart
+            labels={trend.statusLabels}
+            team={trend.turnMedian}
+            target={trend.turnTarget}
+            yMax={90} yMin={0} yStep={15}
+            yFormat={(v) => `${v}m`}
+            leftAxisTitle="Min"
+            metricLabel="Median Turnaround"
+          />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">AI Handling</h3>
+              <div className="card-sub">How the AI handled each quote request · count per {activityBucket}</div>
+            </div>
+          </div>
+          <div className="win-summary">
+            <span className="win-big">{aiAutomatedPct}%</span>
+            <span className="win-sub">fully automated · {aiFullyAutomated} of {aiTotal} quotes · {aiFailedPct}% failed</span>
+          </div>
+          <StackedBars
+            labels={trend.statusLabels}
+            rows={trend.aiRows}
+            order={AI_ORDER}
+            colors={AI_COLORS}
+            height={240}
+          />
+          <div className="stack-legend">
+            {AI_ORDER.map(k => (
+              <span key={k}><span className="legend-dot" style={{ background: AI_COLORS[k] }} /> {k} <span style={{ color: "var(--color-mid-grey)", marginLeft: 2 }}>({aiTotals[k]})</span></span>
+            ))}
           </div>
         </div>
       </div>
